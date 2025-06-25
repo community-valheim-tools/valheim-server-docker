@@ -14,7 +14,13 @@ WORLD_NAME=${WORLD_NAME:-Dedicated}
 SERVER_NAME=${SERVER_NAME:-My Server}
 SERVER_PORT=${SERVER_PORT:-2456}
 SERVER_QUERY_PORT=$((SERVER_PORT + 1))
-SERVER_PASS=${SERVER_PASS-secret}
+
+# allow password to be read from a secrets file
+if [ -n "${SERVER_PASS_FILE}" ]; then
+    SERVER_PASS=$(< "${SERVER_PASS_FILE}")
+else
+    SERVER_PASS=${SERVER_PASS-secret}
+fi
 if [ "${VPCFG_Server_disableServerPassword:-}" = true ]; then
 	SERVER_PASS=""
 fi
@@ -82,7 +88,12 @@ BACKUPS_ZIP=${BACKUPS_ZIP:-true}
 SUPERVISOR_HTTP=${SUPERVISOR_HTTP:-false}
 SUPERVISOR_HTTP_PORT=${SUPERVISOR_HTTP_PORT:-9001}
 SUPERVISOR_HTTP_USER=${SUPERVISOR_HTTP_USER:-admin}
-SUPERVISOR_HTTP_PASS=${SUPERVISOR_HTTP_PASS:-}
+# allow password to be saved in a secrets file
+if [ -n "${SUPERVISOR_HTTP_PASS_FILE}" ]; then
+    SUPERVISOR_HTTP_PASS=$(< "${SUPERVISOR_HTTP_PASS_FILE}")
+else
+    SUPERVISOR_HTTP_PASS=${SUPERVISOR_HTTP_PASS:-}
+fi
 
 # Status http
 STATUS_HTTP=${STATUS_HTTP:-false}
