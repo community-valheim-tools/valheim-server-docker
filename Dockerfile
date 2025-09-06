@@ -94,9 +94,10 @@ RUN mkdir -p /usr/local/etc/supervisor/conf.d/ \
 RUN echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
 
-FROM --platform=linux/386 i386/debian:trixie-slim AS i386-libs
+FROM --platform=linux/386 debian:buster-slim AS i386-libs
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
+RUN sed -i -E 's/(deb|security).debian.org/archive.debian.org/g' /etc/apt/sources.list \
+    && apt-get update \
     && apt-get -y --no-install-recommends install \
     libc6-dev \
     libstdc++6 \
