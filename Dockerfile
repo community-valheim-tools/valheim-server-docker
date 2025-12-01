@@ -20,13 +20,9 @@ ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 
 WORKDIR /build/busybox
+COPY ./busybox.config /build/busybox/.config
 RUN curl -L -o /tmp/busybox.tar.bz2 https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2 \
     && tar xjvf /tmp/busybox.tar.bz2 --strip-components=1 -C /build/busybox \
-    && make defconfig \
-    && sed -i \
-        -e "s/^CONFIG_FEATURE_SYSLOGD_READ_BUFFER_SIZE=.*/CONFIG_FEATURE_SYSLOGD_READ_BUFFER_SIZE=2048/" \
-        -e "s/^CONFIG_TC=y/CONFIG_TC=n/" \
-        .config \
     && make \
     && cp busybox /usr/local/bin/
 
@@ -151,32 +147,29 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && apt-get clean \
     && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd /home/valheim/.config/unity3d/IronGate /config /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
-    && ln -s /usr/local/bin/busybox /usr/local/sbin/syslogd \
-    && ln -s /usr/local/bin/busybox /usr/local/sbin/mkpasswd \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/vi \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/patch \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/unix2dos \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/dos2unix \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/makemime \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/xxd \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/wget \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/bc \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/bunzip2 \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/bzcat \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/bzip2 \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/httpd \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/iostat \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/killall \
     && ln -s /usr/local/bin/busybox /usr/local/bin/less \
     && ln -s /usr/local/bin/busybox /usr/local/bin/lsof \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/httpd \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ssl_client \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ip \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ipcalc \
     && ln -s /usr/local/bin/busybox /usr/local/bin/ping \
     && ln -s /usr/local/bin/busybox /usr/local/bin/ping6 \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/iostat \
     && ln -s /usr/local/bin/busybox /usr/local/bin/setuidgid \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ftpget \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ftpput \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bzip2 \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/ssl_client \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/traceroute \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/traceroute6 \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/unxz \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/vi \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/wget \
     && ln -s /usr/local/bin/busybox /usr/local/bin/xz \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/pstree \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/killall \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bc \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/xzcat \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/xxd \
+    && ln -s /usr/local/bin/busybox /usr/local/sbin/mkpasswd \
+    && ln -s /usr/local/bin/busybox /usr/local/sbin/syslogd \
     && curl -L -o /tmp/steamcmd_linux.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
     && tar xzvf /tmp/steamcmd_linux.tar.gz -C /opt/steamcmd/ \
     && chown valheim:valheim /var/run/valheim \
