@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim AS build-env
+FROM debian:trixie-slim AS build-env
 ENV DEBIAN_FRONTEND=noninteractive
 ARG TESTS
 ARG SOURCE_COMMIT
@@ -8,7 +8,7 @@ ARG GO_VERSION=1.24.1
 
 RUN apt-get update
 RUN apt-get -y install apt-utils
-RUN apt-get -y install build-essential curl git python3 python3-pip shellcheck
+RUN apt-get -y install build-essential curl git python3 python3-setuptools python3-pip pipx shellcheck
 
 # Install Go 1.24 manually
 RUN curl -L -o /tmp/go${GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
@@ -23,14 +23,15 @@ RUN curl -L -o /tmp/busybox.tar.bz2 https://busybox.net/downloads/busybox-${BUSY
     && tar xjvf /tmp/busybox.tar.bz2 --strip-components=1 -C /build/busybox \
     && make defconfig \
     && sed -i -e "s/^CONFIG_FEATURE_SYSLOGD_READ_BUFFER_SIZE=.*/CONFIG_FEATURE_SYSLOGD_READ_BUFFER_SIZE=2048/" .config \
+    && sed -i -e "s/^CONFIG_TC=y/CONFIG_TC=n/" .config \
     && make \
     && cp busybox /usr/local/bin/
 
 WORKDIR /build/env2cfg
 COPY ./env2cfg/ /build/env2cfg/
 RUN if [ "${TESTS:-true}" = true ]; then \
-    pip3 install tox \
-    && tox \
+    pipx ensurepath && pipx install tox \
+    && /root/.local/bin/tox \
     ; \
     fi
 RUN python3 setup.py bdist --format=gztar
@@ -69,7 +70,7 @@ COPY common /usr/local/etc/valheim/
 COPY contrib/* /usr/local/share/valheim/contrib/
 RUN chmod 755 /usr/local/sbin/bootstrap /usr/local/bin/valheim-*
 RUN if [ "${TESTS:-true}" = true ]; then \
-    shellcheck -a -x -s bash -e SC2034 \
+    shellcheck -a -x -s bash -e SC2034 --severity=error \
     /usr/local/sbin/bootstrap \
     /usr/local/bin/valheim-tests \
     /usr/local/bin/valheim-backup \
@@ -86,38 +87,29 @@ WORKDIR /
 RUN rm -rf /usr/local/lib/
 RUN tar xzvf /build/supervisor/dist/supervisor-*.linux-x86_64.tar.gz
 RUN tar xzvf /build/env2cfg/dist/env2cfg-*.linux-x86_64.tar.gz
-RUN tar xzvf /build/python-a2s/dist/python-a2s-*.linux-x86_64.tar.gz
+RUN tar xzvf /build/python-a2s/dist/python_a2s-*.linux-x86_64.tar.gz
 COPY supervisord.conf /usr/local/etc/supervisord.conf
 RUN mkdir -p /usr/local/etc/supervisor/conf.d/ \
     && chmod 640 /usr/local/etc/supervisord.conf
 RUN echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
 
-FROM --platform=linux/386 debian:buster-slim AS i386-libs
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-    && apt-get -y --no-install-recommends install \
-    libc6-dev \
-    libstdc++6 \
-    libsdl2-2.0-0 \
-    libcurl4 \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=build-env /usr/local/ /usr/local/
-COPY --from=i386-libs /lib/ld-linux.so.2 /lib/ld-linux.so.2
-COPY --from=i386-libs /lib/i386-linux-gnu /lib/i386-linux-gnu
-COPY --from=i386-libs /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
 COPY fake-supervisord /usr/bin/supervisord
 
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
+    && dpkg --add-architecture i386 \
     && apt-get update \
     && apt-get -y --no-install-recommends install apt-utils \
     && apt-get -y dist-upgrade \
     && apt-get -y --no-install-recommends install \
+    libc6-dev:i386 \
+    libstdc++6:i386 \
+    libsdl2-2.0-0:i386 \
+    libcurl4:i386 \
     libc6-dev \
     libsdl2-2.0-0 \
     cron \

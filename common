@@ -80,12 +80,12 @@ fatal=5
 log_level=${log_level:-$debug}
 
 
-debug()    { logstd $debug    "DEBUG - [$$] - $*"; }
-info()     { logstd $info     "INFO - $*"; }
-warn()     { logstd $warn     "WARN - $*"; }
-error()    { logerr $error    "ERROR - $*"; }
-critical() { logerr $critical "CRITIAL - $*"; }
-fatal()    { logerr $fatal    "FATAL - $*"; exit 1; }
+debug()    { logstd "$debug"    "DEBUG - [$$] - $*"; }
+info()     { logstd "$info"     "INFO - $*"; }
+warn()     { logstd "$warn"     "WARN - $*"; }
+error()    { logerr "$error"    "ERROR - $*"; }
+critical() { logerr "$critical" "CRITIAL - $*"; }
+fatal()    { logerr "$fatal"    "FATAL - $*"; exit 1; }
 
 
 logstd() {
@@ -184,25 +184,23 @@ server_is_running() {
 server_is_listening() {
     # Check if server is listening on either server or query port
     # since crossplay-enabled servers don't listen on $SERVER_PORT
-    
-    awk -v server_port="$SERVER_PORT" -v server_query_port="$SERVER_QUERY_PORT" '
-        BEGIN {
-            exit_code = 1
-        }
+
+    for HEX_PORT in $(awk '
         {
             if ($1 ~ /^[0-9]/) {
                 split($2, local_bind, ":")
-                listening_port = sprintf("%d", "0x" local_bind[2])
-                if (listening_port == server_query_port || listening_port == server_port) {
-                    exit_code = 0
-                    exit
-                }
+                printf local_bind[2] " "
             }
         }
-        END {
-            exit exit_code
-        }
-    ' /proc/net/udp*
+        ' /proc/net/udp*)
+    do
+        DEC_PORT=$((16#${HEX_PORT}))
+        if [[ "${DEC_PORT}" == "$SERVER_PORT" || "${DEC_PORT}" == "$SERVER_QUERY_PORT" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 
@@ -525,5 +523,5 @@ iec_size_format() {
             byte_size=$((byte_size/1024))
         fi
     done
-    printf "%.2f YiB\\n" $byte_size
+    printf "%.2f YiB\\n" "$byte_size"
 }
