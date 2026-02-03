@@ -20,11 +20,11 @@ mod_name=none
 if [ "$VALHEIM_PLUS" = true ]; then
     cd "$vp_install_path" || fatal "Could not cd $vp_install_path"
     rm -rf "$vp_install_path.old"
-    export DOORSTOP_ENABLE=TRUE
-    export DOORSTOP_INVOKE_DLL_PATH="./BepInEx/core/BepInEx.Preloader.dll"
+    export DOORSTOP_ENABLED=1
+    export DOORSTOP_TARGET_ASSEMBLY=./BepInEx/core/BepInEx.Preloader.dll
     export DOORSTOP_CORLIB_OVERRIDE_PATH="./unstripped_corlib"
     export LD_LIBRARY_PATH="$vp_install_path/linux64/:$vp_install_path/doorstop_libs/"
-    SERVER_LD_PRELOAD=libdoorstop_x64.so
+    SERVER_LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"
     valheim_server="$vp_install_path/valheim_server.x86_64"
     if [ -n "$SERVER_PASS" ]; then
         valheim_server_args+=(-password "$SERVER_PASS")
@@ -33,11 +33,11 @@ if [ "$VALHEIM_PLUS" = true ]; then
 elif [ "$BEPINEX" = true ]; then
     cd "$bepinex_install_path" || fatal "Could not cd $bepinex_install_path"
     rm -rf "$bepinex_install_path.old"
-    export DOORSTOP_ENABLE=TRUE
-    export DOORSTOP_INVOKE_DLL_PATH="./BepInEx/core/BepInEx.Preloader.dll"
+    export DOORSTOP_ENABLED=1
+    export DOORSTOP_TARGET_ASSEMBLY=./BepInEx/core/BepInEx.Preloader.dll
     export DOORSTOP_CORLIB_OVERRIDE_PATH="./unstripped_corlib"
     export LD_LIBRARY_PATH="$bepinex_install_path/linux64/:$bepinex_install_path/doorstop_libs/"
-    SERVER_LD_PRELOAD=libdoorstop_x64.so
+    SERVER_LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"
     valheim_server="$bepinex_install_path/valheim_server.x86_64"
     if [ -n "$SERVER_PASS" ]; then
         valheim_server_args+=(-password "$SERVER_PASS")
@@ -46,7 +46,7 @@ elif [ "$BEPINEX" = true ]; then
 else
     cd "$valheim_install_path" || fatal "Could not cd $valheim_install_path"
     export LD_LIBRARY_PATH="$valheim_install_path/linux64/"
-    SERVER_LD_PRELOAD=""
+    SERVER_LD_PRELOAD="$LD_PRELOAD"
     valheim_server="$valheim_install_path/valheim_server.x86_64"
     valheim_server_args+=(-password "$SERVER_PASS")
 fi
@@ -95,11 +95,11 @@ wait_for_server_listening() {
     while :; do
         if server_is_listening; then
             update_server_status running
-            debug "Server is now listening on UDP query port $SERVER_QUERY_PORT"
+            debug "Server is now listening on UDP query port $SERVER_PORT"
             post_server_listening_hook
             break
         else
-            debug "Waiting for server to listen on UDP query port $SERVER_QUERY_PORT"
+            debug "Waiting for server to listen on UDP query port $SERVER_PORT"
             sleep 5
         fi
     done
@@ -118,11 +118,11 @@ run_server() {
     setsid env \
         SERVER_LD_PRELOAD="$SERVER_LD_PRELOAD" \
         LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
-        DOORSTOP_ENABLE="$DOORSTOP_ENABLE" \
-        DOORSTOP_INVOKE_DLL_PATH="$DOORSTOP_INVOKE_DLL_PATH" \
+        DOORSTOP_ENABLED="$DOORSTOP_ENABLED" \
+        DOORSTOP_TARGET_ASSEMBLY="$DOORSTOP_TARGET_ASSEMBLY" \
         DOORSTOP_CORLIB_OVERRIDE_PATH="$DOORSTOP_CORLIB_OVERRIDE_PATH" \
         bash -c \
-            'export LD_LIBRARY_PATH DOORSTOP_ENABLE DOORSTOP_INVOKE_DLL_PATH DOORSTOP_CORLIB_OVERRIDE_PATH; LD_PRELOAD=$SERVER_LD_PRELOAD exec "$0" "$@"' \
+            'export LD_LIBRARY_PATH DOORSTOP_ENABLED DOORSTOP_TARGET_ASSEMBLY DOORSTOP_CORLIB_OVERRIDE_PATH; LD_PRELOAD=$SERVER_LD_PRELOAD exec "$0" "$@"' \
             "$valheim_server" -nographics -batchmode -name "$SERVER_NAME" -port "$SERVER_PORT" -world "$WORLD_NAME" -public "$SERVER_PUBLIC" \
             "${valheim_server_args[@]}" $SERVER_ARGS > >(filter) 2>&1 &
 
