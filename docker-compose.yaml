@@ -1,6 +1,6 @@
 services:
   valheim:
-    image: ghcr.io/lloesche/valheim-server
+    image: ghcr.io/community-valheim-tools/valheim-server
     cap_add:
       - sys_nice
     volumes:

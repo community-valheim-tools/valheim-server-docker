@@ -5,13 +5,13 @@ cat <<EOF
 
 You are seeing this message because your container manager is executing the wrong startup CMD.
 
-It is running the CMD from an old version of lloesche/valheim-server on a new version of lloesche/valheim-server
+It is running the CMD from an old version of lloesche/valheim-server on a new version of community-valheim-tools/valheim-server
 
 If you are using a Synology NAS check this help page:
-https://github.com/lloesche/valheim-server-docker#error-after-download-of-new-container-image
+https://github.com/community-valheim-tools/valheim-server-docker#error-after-download-of-new-container-image
 
 If you are using Portainer read this for information on updating the CMD:
-https://github.com/lloesche/valheim-server-docker#changing-startup-cmd-in-portainer
+https://github.com/community-valheim-tools/valheim-server-docker#changing-startup-cmd-in-portainer
 
 If you are on a different system the safest way to resolve this issue is to delete the container and re-create it from scratch.
 

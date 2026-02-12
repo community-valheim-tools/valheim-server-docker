@@ -450,7 +450,7 @@ CDK Project for spinning up a Valheim game server on AWS Using ECS Fargate and A
 
 ```
 $ sudo mkdir -p /var/lib/valheim/{config,data}
-$ sudo curl -o /var/lib/valheim/valheim.nomad https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/valheim.nomad
+$ sudo curl -o /var/lib/valheim/valheim.nomad https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/valheim.nomad
 $ sudo nomad job run /var/lib/valheim/valheim.nomad
 ```
 
@@ -530,7 +530,7 @@ docker exec -it valheim-server supervisorctl restart valheim-backup
 ```
 
 The restart can also be done from [the Supervisor web UI](#supervisor).
-![Backup Step 1](https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/misc/backup1.png "Backup Step 1")
+![Backup Step 1](https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/misc/backup1.png "Backup Step 1")
 
 # Finding Your Server
 
@@ -548,7 +548,7 @@ There are three ways of getting to your server. Either using the Steam server br
 
 When in-game, click on `Join Game` and select `Community`. Wait for the game to load the list of all 4000+ servers.
 Only 200 servers will be shown at a time so we will have to enter part of our server name to filter the view.
-![in-game server browser](https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/misc/find1.png "in-game server browser")
+![in-game server browser](https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/misc/find1.png "in-game server browser")
 
 ### Joining Directly via Hostname/IP
 
@@ -565,7 +565,7 @@ This method of connecting to your server will work even if your server is not pu
 
 When using the Steam server browser, in Steam go to `View -> Servers`. Click on `CHANGE FILTERS` and select Game `Valheim`.
 Wait for Steam to load all 4000+ Servers then sort the `SERVERS` column by clicking on its title. Scroll down until you find your server.
-![Steam server browser](https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/misc/find2.png "Steam server browser")
+![Steam server browser](https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/misc/find2.png "Steam server browser")
 From there you can right-click it and add as a favourite.
 
 Note that in my tests when connecting to the server via the Steam server browser I had to enter the server password twice. Once in Steam and once in-game.
@@ -585,7 +585,7 @@ Steps:
 5. `FIND GAMES AT THIS ADDRESS...`
 6. `ADD SELECTED GAME SERVER TO FAV...`
 
-![Add server manually](https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/misc/find3.png "Add server manually")
+![Add server manually](https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/misc/find3.png "Add server manually")
 
 Do not use the `ADD THIS ADDRESS TO FAVORITES` button at this point.
 
@@ -842,7 +842,7 @@ If you are getting the following error after an Update:
 ```
 
 You will need to remove the container completely and perform the [First install](#first-install) steps again.
-![Error Step 3](https://raw.githubusercontent.com/lloesche/valheim-server-docker/main/misc/synology_upgrade_error3.png "Error Step 3")
+![Error Step 3](https://raw.githubusercontent.com/community-valheim-tools/valheim-server-docker/main/misc/synology_upgrade_error3.png "Error Step 3")
 
 Make sure to use the same folder settings as before so the existing `/config` and `/opt/valheim` directories are used.
 

@@ -18,7 +18,7 @@ ExecStart=/usr/bin/docker run \
           -v /opt/valheim:/opt/valheim:Z \
           -p 2456-2457:2456-2457/udp \
           --env-file /etc/sysconfig/valheim-server \
-          ghcr.io/lloesche/valheim-server
+          ghcr.io/community-valheim-tools/valheim-server
 ExecStop=/usr/bin/docker stop %n
 Restart=always
 RestartSec=10s
