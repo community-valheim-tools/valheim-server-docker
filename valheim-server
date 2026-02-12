@@ -20,9 +20,8 @@ mod_name=none
 if [ "$VALHEIM_PLUS" = true ]; then
     cd "$vp_install_path" || fatal "Could not cd $vp_install_path"
     rm -rf "$vp_install_path.old"
-    export DOORSTOP_ENABLE=TRUE
-    export DOORSTOP_INVOKE_DLL_PATH="./BepInEx/core/BepInEx.Preloader.dll"
-    export DOORSTOP_CORLIB_OVERRIDE_PATH="./unstripped_corlib"
+    export DOORSTOP_ENABLED=1
+    export DOORSTOP_TARGET_ASSEMBLY="./BepInEx/core/BepInEx.Preloader.dll"
     export LD_LIBRARY_PATH="$vp_install_path/linux64/:$vp_install_path/doorstop_libs/"
     SERVER_LD_PRELOAD=libdoorstop_x64.so
     valheim_server="$vp_install_path/valheim_server.x86_64"
