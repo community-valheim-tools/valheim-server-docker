@@ -118,7 +118,6 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && apt-get -y --no-install-recommends install \
     libc6-dev \
     libsdl2-2.0-0 \
-    cron \
     curl \
     iproute2 \
     libcurl4 \
@@ -143,7 +142,6 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && ln -s /bin/bash /bin/sh \
     && locale-gen \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
-    && usermod -a -G crontab valheim \
     && apt-get clean \
     && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd /home/valheim/.config/unity3d/IronGate /config /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
@@ -151,6 +149,7 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && ln -s /usr/local/bin/busybox /usr/local/bin/bunzip2 \
     && ln -s /usr/local/bin/busybox /usr/local/bin/bzcat \
     && ln -s /usr/local/bin/busybox /usr/local/bin/bzip2 \
+    && ln -s /usr/local/bin/busybox /usr/local/bin/crontab \
     && ln -s /usr/local/bin/busybox /usr/local/bin/httpd \
     && ln -s /usr/local/bin/busybox /usr/local/bin/iostat \
     && ln -s /usr/local/bin/busybox /usr/local/bin/killall \
@@ -168,13 +167,15 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && ln -s /usr/local/bin/busybox /usr/local/bin/xz \
     && ln -s /usr/local/bin/busybox /usr/local/bin/xzcat \
     && ln -s /usr/local/bin/busybox /usr/local/bin/xxd \
+    && ln -s /usr/local/bin/busybox /usr/local/sbin/crond \
     && ln -s /usr/local/bin/busybox /usr/local/sbin/mkpasswd \
     && ln -s /usr/local/bin/busybox /usr/local/sbin/syslogd \
     && curl -L -o /tmp/steamcmd_linux.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
     && tar xzvf /tmp/steamcmd_linux.tar.gz -C /opt/steamcmd/ \
-    && chown valheim:valheim /var/run/valheim \
+    && chown -R valheim:valheim /var/run/valheim \
     && chown -R root:root /opt/steamcmd \
-    && chmod 755 /opt/steamcmd/steamcmd.sh \
+    && chmod u=rwx,go=rx /opt/steamcmd/steamcmd.sh \
+    && chmod a+s /usr/local/bin/crontab \
     /opt/steamcmd/linux32/steamcmd \
     /opt/steamcmd/linux32/steamerrorreporter \
     /usr/bin/supervisord \
