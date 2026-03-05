@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
@@ -21,7 +23,7 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -42,7 +44,7 @@ jobs:
         run: docker save -o valheim-test.tar valheim-test
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: valheim-test-image
           path: valheim-test.tar
@@ -65,7 +67,7 @@ jobs:
             env: "-e BEPINEX=true"
     steps:
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: valheim-test-image
 
@@ -88,22 +90,21 @@ jobs:
 
   build_and_push:
     name: Build and Push Docker Image
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -124,30 +125,35 @@ jobs:
           images: |
             ghcr.io/community-valheim-tools/valheim-server
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest
+            type=semver,pattern={{version}}
             type=sha
           labels: |
             org.opencontainers.image.title=valheim-server
             org.opencontainers.image.description=Valheim Server
-            org.opencontainers.image.url=https://github.com/community-valheim-tools/valheim-server-docker
-            org.opencontainers.image.source=https://github.com/community-valheim-tools/valheim-server-docker
-            org.opencontainers.image.version=${{ github.sha }}
-            org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.documentation=https://github.com/community-valheim-tools/valheim-server-docker/blob/main/README.md
-          annotations: |
-            org.opencontainers.image.description=Valheim Server
-            org.opencontainers.image.source=https://github.com/community-valheim-tools/valheim-server-docker
-            org.opencontainers.image.licenses=Apache-2.0
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           build-args: SOURCE_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ github.ref_name }}" --generate-notes --notes-start-tag "$(cat <<'EOF'
+          ## Container Image
+          ```
+          docker pull ghcr.io/community-valheim-tools/valheim-server:${{ steps.meta.outputs.version }}
+          ```
+          EOF
+          )"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
