@@ -1,0 +1,43 @@
+name: Notify Legacy GHCR Shim
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag ref to send to the shim repo
+        required: false
+        default: refs/heads/main
+      sha:
+        description: Exact commit SHA to build; defaults to current commit
+        required: false
+
+jobs:
+  notify-shim:
+    name: Trigger shim repository build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch build to shim repository
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.SHIM_REPO_DISPATCH_TOKEN }}
+          script: |
+            const requestedRef = context.eventName === "workflow_dispatch"
+              ? (core.getInput("ref") || "refs/heads/main")
+              : context.ref;
+
+            const requestedSha = context.eventName === "workflow_dispatch"
+              ? (core.getInput("sha") || context.sha)
+              : context.sha;
+
+            await github.rest.repos.createDispatchEvent({
+              owner: "lloesche",
+              repo: "valheim-server-docker-shim",
+              event_type: "upstream-update",
+              client_payload: {
+                ref: requestedRef,
+                sha: requestedSha
+              }
+            });
