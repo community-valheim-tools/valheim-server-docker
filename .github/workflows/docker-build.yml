@@ -109,7 +109,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
 #      - name: Login to Docker Hub
 #        if: github.event_name != 'pull_request'
@@ -132,6 +132,7 @@ jobs:
             org.opencontainers.image.title=valheim-server
             org.opencontainers.image.description=Valheim Server
             org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/community-valheim-tools/valheim-server-docker
             org.opencontainers.image.documentation=https://github.com/community-valheim-tools/valheim-server-docker/blob/main/README.md
 
       - name: Build and push Docker image
