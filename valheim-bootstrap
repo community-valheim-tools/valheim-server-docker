@@ -56,6 +56,12 @@ if [ "$VALHEIM_PLUS" = true ] && [ "$BEPINEX" = true ]; then
     exit 1
 fi
 
+if [ "$MOD_MANAGER" = true ] && [ "$BEPINEX" != true ]; then
+    error "Configuration error: MOD_MANAGER=true requires BEPINEX=true - aborting startup"
+    supervisorctl shutdown
+    exit 1
+fi
+
 if [ "$VALHEIM_PLUS" = true ]; then
     mkdir -p "$vp_download_path"
     mkdir -p "$vp_install_path"
@@ -70,6 +76,12 @@ if [ "$BEPINEX" = true ]; then
     mkdir -p "$bepinex_install_path"
     if [ -d "$bepinex_config_path" ]; then
         write_bepinex_config "$bepinex_config_path" "$bepinex_install_path/BepInEx/plugins"
+    fi
+    if [ "$MOD_MANAGER" = true ]; then
+        mkdir -p "$MOD_MANAGER_CACHE_DIR"
+        if [ -n "$MOD_MANAGER_MODS" ]; then
+            write_mod_manager_config
+        fi
     fi
 fi
 

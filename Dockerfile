@@ -1,3 +1,9 @@
+FROM rust:slim-bookworm AS vmm-build
+ARG VMM_VERSION=0.2.0
+RUN cargo install valheim-mod-manager --version "${VMM_VERSION}" \
+    && strip /usr/local/cargo/bin/vmm
+
+
 FROM debian:trixie-slim AS build-env
 ENV DEBIAN_FRONTEND=noninteractive
 ARG TESTS
@@ -6,6 +12,7 @@ ARG BUSYBOX_VERSION=1.36.1
 ARG SUPERVISOR_VERSION=4.2.5
 ARG GO_VERSION=1.24.1
 ARG PYTHON_A2S_VERSION=1.4.1
+ARG VMM_VERSION=0.1.5
 
 RUN apt-get update
 RUN apt-get -y install apt-utils
@@ -54,11 +61,13 @@ COPY valheim-backup /usr/local/bin/
 COPY valheim-updater /usr/local/bin/
 COPY valheim-plus-updater /usr/local/bin/
 COPY bepinex-updater /usr/local/bin/
+COPY --from=vmm-build /usr/local/cargo/bin/vmm /usr/local/bin/vmm
+COPY valheim-mod-manager /usr/local/bin/
 COPY valheim-server /usr/local/bin/
 COPY defaults /usr/local/etc/valheim/
 COPY common /usr/local/etc/valheim/
 COPY contrib/* /usr/local/share/valheim/contrib/
-RUN chmod 755 /usr/local/sbin/bootstrap /usr/local/bin/valheim-*
+RUN chmod 755 /usr/local/sbin/bootstrap /usr/local/bin/valheim-* /usr/local/bin/vmm
 RUN if [ "${TESTS:-true}" = true ]; then \
     shellcheck -a -x -s bash -e SC2034 \
     /usr/local/sbin/bootstrap \
@@ -70,6 +79,7 @@ RUN if [ "${TESTS:-true}" = true ]; then \
     /usr/local/bin/valheim-updater \
     /usr/local/bin/valheim-plus-updater \
     /usr/local/bin/bepinex-updater \
+    /usr/local/bin/valheim-mod-manager \
     /usr/local/share/valheim/contrib/*.sh \
     ; \
     fi
@@ -143,7 +153,8 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && locale-gen \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && apt-get clean \
-    && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd /home/valheim/.config/unity3d/IronGate /config /var/run/valheim \
+    && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd \
+                /home/valheim/.config/unity3d/IronGate /config /config/vmm_cache /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
     && ln -s /usr/local/bin/busybox /usr/local/bin/bc \
     && ln -s /usr/local/bin/busybox /usr/local/bin/bunzip2 \
