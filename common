@@ -41,6 +41,10 @@ bepinex_mergefile="$bepinex_download_path/merge" # Signaling file created by val
                                                  # with BepInEx
 bepinex_zipfile=BepInEx.zip                      # Name of the BepInEx archive
 
+# Mod Manager (vmm)
+mod_manager_wrapper=/usr/local/bin/valheim-mod-manager
+mod_manager_config=/config/vmm_config.toml
+
 # Collection of PID files
 valheim_server_pidfile=/var/run/valheim/valheim-server.pid
 valheim_updater_pidfile=/var/run/valheim/valheim-updater.pid
@@ -319,6 +323,30 @@ update_server_status() {
 
 write_bannedlist() {
     write_serverlist banned "$BANNEDLIST_IDS"
+}
+
+
+write_mod_manager_config() {
+    local mods_toml
+    local mod_list=""
+    local first=true
+    # Convert space/comma-separated MOD_MANAGER_MODS into TOML array entries
+    for mod in $(echo "$MOD_MANAGER_MODS" | tr ',' ' '); do
+        if [ "$first" = true ]; then
+            mod_list="\"$mod\""
+            first=false
+        else
+            mod_list="$mod_list, \"$mod\""
+        fi
+    done
+    mods_toml="[$mod_list]"
+    debug "Writing vmm config to $mod_manager_config"
+    cat > "$mod_manager_config" <<EOF
+mod_list = ${mods_toml}
+log_level = "$MOD_MANAGER_LOG_LEVEL"
+cache_dir = "$MOD_MANAGER_CACHE_DIR"
+install_dir = "$bepinex_install_path/BepInEx/plugins"
+EOF
 }
 
 
