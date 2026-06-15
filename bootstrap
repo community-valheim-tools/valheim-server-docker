@@ -24,6 +24,7 @@ apply_permissions() {
     #usermod -u "${PUID}" -o -g valheim valheim
     sed -i -E "s/^(valheim:x):[0-9]+:[0-9]+:(.*)/\\1:$PUID:$PGID:\\2/" /etc/passwd
 
+    mkdir -p /var/run/valheim
     touch "$SERVER_STATUS_FILE"
 
     chown -R valheim:valheim \
