@@ -11,6 +11,7 @@ BACKUPS_DIRECTORY=${BACKUPS_DIRECTORY%/}
 pidfile=$valheim_backup_pidfile
 next_backup=$(date +%s)
 run=true
+worldFileExtensions={db,fwl,db.old,fwl.old,chunks,db2,fwl2,ok,chunk}
 
 
 main() {
@@ -71,7 +72,7 @@ backup() {
         local backup_suffix
         backup_suffix=$(date +%Y%m%d-%H%M%S)
 
-        for extension in {db,fwl,db.old,fwl.old}; do
+        for extension in worldFileExtensions; do
             world_file="$WORLDS_DIR/$WORLD_NAME.$extension"
             if [ ! -f "$world_file" ]; then
                 debug "World file $world_file not found - skipping"
@@ -123,7 +124,7 @@ flush_old() {
         if [ "${BACKUPS_ZIP}" = true ]; then
             find "$BACKUPS_DIRECTORY" -type f -name "worlds-*.zip" -printf '%T@ %p\0' | sort -z -n -r | cut -z -s -d " " -f "2-" | tail -z -n +$((BACKUPS_MAX_COUNT+1)) | xargs -0 rm -fv -- 2>/dev/null
         else
-            for extension in {db,fwl,db.old,fwl.old,chunks,db2,fwl2,ok,chunk}; do
+            for extension in worldFileExtensions; do
                 find "$BACKUPS_DIRECTORY" -type f -name "AUTOBACKUP-${WORLD_NAME}-*.${extension}" -printf '%T@ %p\0' | sort -z -n -r | cut -z -s -d " " -f "2-" | tail -z -n +$((BACKUPS_MAX_COUNT+1)) | xargs -0 rm -v -- 2>/dev/null
             done
         fi
@@ -133,7 +134,7 @@ flush_old() {
     if [ "${BACKUPS_ZIP}" = true ]; then
         find "$BACKUPS_DIRECTORY" -type f -mmin "+$((BACKUPS_MAX_AGE*60*24))" -name "worlds-*.zip" -print -exec rm -f "{}" \;
     else
-        for extension in {db,fwl,db.old,fwl.old,chunks,db2,fwl2,ok,chunk}; do
+        for extension in worldFileExtensions; do
             find "$BACKUPS_DIRECTORY" -type f -mmin "+$((BACKUPS_MAX_AGE*60*24))" -name "AUTOBACKUP-${WORLD_NAME}-*.${extension}" -print -exec rm -f "{}" \;
         done
     fi
