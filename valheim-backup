@@ -88,14 +88,14 @@ backup() {
             chmod "$BACKUPS_FILE_PERMISSIONS" "$backup_file"
             post_backup_hook "$backup_file"
         done
-        world_folder="${worlds_dir}/${WORLD_NAME}"
+        world_folder="$worlds_dir/$WORLD_NAME"
         if [ -d "${world_folder}" ]; then
             backup_folder="$BACKUPS_DIRECTORY/AUTOBACKUP-${WORLD_NAME}-$backup_suffix"
             pre_backup_hook "$backup_folder"
             info "Backing up Valheim server world folder $world_folder to $backup_folder"
             mkdir -v -p "$backup_folder"
             for extension in "${worldFileExtensions[@]}"; do
-                for file in "$world_folder/*.$extension"; do
+                for file in "$world_folder/*".$extension; do
                     if [ -f "$file" ]; then
                         info "Backing up Valheim server world file $file to $backup_folder"
                         cp -v "$file" "$backup_folder"
