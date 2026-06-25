@@ -129,10 +129,10 @@ ensure_permissions() {
     fi
     if [ -d "$worlds_dir" ]; then
         chmod "$WORLDS_DIRECTORY_PERMISSIONS" "$worlds_dir"
-        # Set permissions for all files and folders in the worlds dir
-        chmod -R "$WORLDS_FILE_PERMISSIONS" "${worlds_dir}/"*
         # Set permissions for all folders in the worlds dir
         find "${worlds_dir}/" -type d -exec chmod "$WORLDS_DIRECTORY_PERMISSIONS" {} \;
+        # Set permissions for all files in the worlds dir
+        find "${worlds_dir}/" -type f -exec chmod "$WORLDS_FILE_PERMISSIONS" {} \;
         # Set permissions specifically for WORLD_NAME, misses auto-backup files (which will cause a failure to start server)
         #if [ -d "${worlds_dir}/${WORLD_NAME}" ]; then
         #    chmod "$WORLDS_DIRECTORY_PERMISSIONS" "$worlds_dir/${WORLD_NAME}"
