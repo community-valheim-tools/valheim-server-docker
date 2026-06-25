@@ -61,6 +61,8 @@ backup() {
     mkdir -p "$BACKUPS_DIRECTORY"
     chmod "$BACKUPS_DIRECTORY_PERMISSIONS" "$BACKUPS_DIRECTORY"
 
+    ensure_permissions # in case new chunks have been created
+
     if [ "${BACKUPS_ZIP}" = true ]; then
         backup_file="$BACKUPS_DIRECTORY/worlds-$(date +%Y%m%d-%H%M%S).zip"
         pre_backup_hook "$backup_file"
