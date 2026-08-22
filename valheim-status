@@ -20,7 +20,8 @@ import json
 import socket
 import time
 import logging
-from typing import Dict
+import urllib.request
+from typing import Dict, Optional
 from signal import signal, SIGTERM, SIGINT
 from argparse import ArgumentParser
 from datetime import datetime, timezone
@@ -35,6 +36,20 @@ log.setLevel(logging.INFO)
 
 run = True
 
+# With crossplay enabled the server does not answer A2S queries. Instead it
+# registers a lobby with PlayFab (the backend the in-game server browser and
+# join-code flow use), which we can query anonymously for the same data.
+# See https://github.com/lloesche/valheim-server-docker/issues/663
+PLAYFAB_TITLE_ID = "6E223"
+PLAYFAB_API = f"https://{PLAYFAB_TITLE_ID}.playfabapi.com"
+DOTNET_EPOCH_TICKS = 621355968000000000
+JOINCODE_FILE = "/var/run/valheim/valheim-joincode.txt"
+ENTITY_ID_FILE = "/var/run/valheim/playfab-entity-id.txt"
+
+playfab_token: Optional[str] = None
+playfab_token_expires: float = 0.0
+playfab_entity_id: Optional[str] = None
+
 
 def main() -> None:
     parser = get_arg_parser()
@@ -46,9 +61,15 @@ def main() -> None:
     query_port = args.port + 1
     status_file = args.status_file
 
+    use_playfab = args.playfab or crossplay_enabled()
+    if use_playfab:
+        status_fn = lambda: get_playfab_status(args.port)  # noqa: E731
+    else:
+        status_fn = lambda: get_status(query_host, query_port)  # noqa: E731
+
     if not args.update:
-        status = get_status(query_host, query_port)
-        num_players = len(status.get("players", []))
+        status = status_fn()
+        num_players = status.get("player_count", len(status.get("players", [])))
         if status.get("error") is not None:
             exit_code = 125 if args.timeout_is_error else 0
         else:
@@ -62,14 +83,17 @@ def main() -> None:
     signal(SIGINT, handler)
     signal(SIGTERM, handler)
     log.info("Valheim status updater started")
+    if use_playfab:
+        log.info("Crossplay enabled - using PlayFab lobby query instead of A2S")
     log.debug(
         (
-            f"Writing status from {query_host}:{query_port}"
+            f"Writing status from "
+            f"{'PlayFab' if use_playfab else f'{query_host}:{query_port}'}"
             f" to {status_file} every {args.frequency}s"
         )
     )
     while run:
-        status = get_status(query_host, query_port)
+        status = status_fn()
         write_status(status, status_file)
         time.sleep(args.frequency)
 
@@ -114,6 +138,134 @@ def get_status(query_host: str, query_port: int) -> Dict:
     return status
 
 
+def crossplay_enabled() -> bool:
+    return (
+        os.getenv("CROSSPLAY", "false").lower() == "true"
+        or "-crossplay" in os.getenv("SERVER_ARGS", "").lower()
+    )
+
+
+def playfab_api(path: str, body: Dict, entity_token: Optional[str] = None) -> Dict:
+    headers = {"Content-Type": "application/json"}
+    if entity_token:
+        headers["X-EntityToken"] = entity_token
+    req = urllib.request.Request(
+        PLAYFAB_API + path, data=json.dumps(body).encode(), headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return json.load(response)["data"]
+
+
+def get_playfab_token() -> str:
+    global playfab_token, playfab_token_expires
+    if playfab_token is None or time.time() > playfab_token_expires:
+        data = playfab_api(
+            "/Client/LoginWithCustomID",
+            {
+                "TitleId": PLAYFAB_TITLE_ID,
+                "CustomId": "valheim-server-docker-status",
+                "CreateAccount": True,
+            },
+        )
+        playfab_token = data["EntityToken"]["EntityToken"]
+        # Tokens are valid for ~24h, refresh well before expiry
+        playfab_token_expires = time.time() + 20 * 3600
+    return playfab_token
+
+
+def read_line(path: str) -> Optional[str]:
+    try:
+        with open(path) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def playfab_lobby_filter() -> str:
+    # Identify our server's lobby, most reliable source first:
+    # a pinned entity id (stable for the life of the container - it derives
+    # from the machine id, so it changes when the container is recreated),
+    # the join code captured from the server log (authoritative but rotates
+    # every restart), and finally the server name (not globally unique -
+    # last resort).
+    def esc(value: str) -> str:
+        return value.replace("'", "''")
+
+    entity_id = (
+        os.getenv("PLAYFAB_ENTITY_ID") or playfab_entity_id or read_line(ENTITY_ID_FILE)
+    )
+    if entity_id:
+        return f"string_key1 eq '{esc(entity_id)}' and string_key2 eq 'True'"
+    join_code = os.getenv("PLAYFAB_JOIN_CODE") or read_line(JOINCODE_FILE)
+    if join_code:
+        return f"string_key4 eq '{esc(join_code)}' and string_key2 eq 'True'"
+    server_name = os.getenv("SERVER_NAME", "")
+    log.warning(
+        "No PlayFab entity id or join code available"
+        f" - falling back to lookup by server name {server_name!r}"
+    )
+    return f"string_key5 eq '{esc(server_name)}' and string_key2 eq 'True'"
+
+
+def pin_playfab_entity_id(entity_id: str) -> None:
+    global playfab_entity_id
+    if playfab_entity_id != entity_id:
+        playfab_entity_id = entity_id
+        log.info(f"Pinned PlayFab entity id {entity_id}")
+        try:
+            with open(ENTITY_ID_FILE, "w") as f:
+                f.write(entity_id)
+        except OSError as e:
+            log.debug(f"Could not persist PlayFab entity id: {e}")
+
+
+def get_playfab_status(server_port: int) -> Dict:
+    status = {
+        "last_status_update": datetime.utcnow().replace(tzinfo=timezone.utc),
+        "error": None,
+    }
+    try:
+        data = playfab_api(
+            "/Lobby/FindLobbies",
+            {"Filter": playfab_lobby_filter()},
+            entity_token=get_playfab_token(),
+        )
+    except Exception as e:
+        status.update({"error": e})
+        return status
+    lobbies = data.get("Lobbies", [])
+    if not lobbies:
+        status.update({"error": "No active PlayFab lobby (server not registered)"})
+        return status
+    # A crashed server can leave a stale lobby behind - the newest one is live
+    lobby = max(lobbies, key=lambda x: int(x["SearchData"].get("string_key9", 0)))
+    sd = lobby["SearchData"]
+    created_ticks = int(sd.get("string_key9", 0))
+    pin_playfab_entity_id(sd["string_key1"])
+    status.update(
+        {
+            "server_name": sd.get("string_key5"),
+            "server_type": "d",
+            "platform": "playfab",
+            # The server itself occupies one lobby slot
+            "player_count": lobby["CurrentPlayers"] - 1,
+            "max_players": lobby["MaxPlayers"] - 1,
+            "port": server_port,
+            "join_code": sd.get("string_key4"),
+            "public_ip": sd.get("string_key10"),
+            "game_version": sd.get("string_key6"),
+            "lobby_created": datetime.fromtimestamp(
+                (created_ticks - DOTNET_EPOCH_TICKS) / 10_000_000, tz=timezone.utc
+            )
+            if created_ticks
+            else None,
+            # Player names are not available from the PlayFab lobby
+            "players": [],
+        }
+    )
+    return status
+
+
 def handler(sig, frame) -> None:
     global run
     run = False
@@ -143,6 +295,16 @@ def get_arg_parser() -> ArgumentParser:
         "--update",
         help="Update status continuously and write to status.json.",
         dest="update",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--playfab",
+        help=(
+            "Query the PlayFab lobby instead of A2S"
+            " (default when crossplay is enabled)"
+        ),
+        dest="playfab",
         action="store_true",
         default=False,
     )

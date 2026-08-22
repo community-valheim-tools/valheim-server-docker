@@ -166,7 +166,9 @@ Without it you will see a message `Warning: failed to set thread priority` in th
 | `SUPERVISOR_HTTP_USER`      | `admin`                  | Supervisor http server username                                                                                                                                                                                                                                                        |
 | `SUPERVISOR_HTTP_PASS`      |                          | Supervisor http server password                                                                                                                                                                                                                                                        |
 | `SUPERVISOR_HTTP_PASS_FILE` |                          | Set to a secrets path (ie `/run/secrets/supervisor_pass`) to read the supervisor password from a secret instead of environment variables                                                                                                                                               |
-| `STATUS_HTTP`               | `false`                  | Turn on the status http server. Only useful on public servers (`SERVER_PUBLIC=true`).                                                                                                                                                                                                  |
+| `STATUS_HTTP`               | `false`                  | Turn on the status http server. Requires a public server (`SERVER_PUBLIC=true`) unless crossplay is enabled, in which case it works for private servers too. See the [Status web server](#status-web-server) section.                                                                   |
+| `PLAYFAB_ENTITY_ID`         | not set                  | Optional: explicitly identify this server's PlayFab lobby for the crossplay status query. Normally discovered automatically.                                                                                                                                                            |
+| `PLAYFAB_JOIN_CODE`         | not set                  | Optional: identify this server's PlayFab lobby by join code for the crossplay status query. Normally discovered automatically.                                                                                                                                                          |
 | `STATUS_HTTP_PORT`          | `80`                     | Status http server tcp port                                                                                                                                                                                                                                                            |
 | `STATUS_HTTP_CONF`          | `/config/httpd.conf`     | Path to the [busybox httpd config](https://git.busybox.net/busybox/tree/networking/httpd.c)                                                                                                                                                                                            |
 | `STATUS_HTTP_HTDOCS`        | `/opt/valheim/htdocs`    | Path to the status httpd htdocs where `status.json` is written                                                                                                                                                                                                                         |
@@ -639,7 +641,9 @@ If Supervisor's http server is enabled it also provides an XML-RPC API at `/RPC2
 If `STATUS_HTTP` is set to `true` the status web server will be started.
 By default it runs on container port `80` but can be customized using `STATUS_HTTP_PORT`.
 
-This only works for public Valheim servers (`SERVER_PUBLIC=true`) because private ones do not answer to [Steam server queries](https://developer.valvesoftware.com/wiki/Server_queries).
+For Steam-only servers this works via [Steam server queries](https://developer.valvesoftware.com/wiki/Server_queries) and requires a public server (`SERVER_PUBLIC=true`), because private ones do not answer A2S queries.
+
+With `CROSSPLAY=true` the server does not answer A2S queries at all. In that case the status updater instead queries the PlayFab lobby the server registers for the in-game server browser and join-code flow. This works for both public and private (`SERVER_PUBLIC=false`) crossplay servers. The lobby is identified automatically: the join code is captured from the server log and the server's PlayFab entity id (stable for the life of the container) is pinned from the first successful lookup, so status keeps working when the join code rotates on server restart. If needed, `PLAYFAB_ENTITY_ID` or `PLAYFAB_JOIN_CODE` can be set to identify the server explicitly. Player names are not available from the PlayFab lobby, but the player count, join code, and public IP are.
 
 A `/status.json` will be updated every 10 seconds.
 
@@ -680,7 +684,27 @@ Once the server is running and listening on its UDP ports `/status.json` will co
 }
 ```
 
-All the information in `status.json` is fetched from Valheim servers public query port. You will notice that some of the fields like player name or player score currently contain no information. However for completeness the entire query response is left intact.
+On a crossplay server `/status.json` looks like this instead
+
+```
+{
+  "last_status_update": "2026-08-10T12:00:14.123456+00:00",
+  "error": null,
+  "server_name": "My Docker based server",
+  "server_type": "d",
+  "platform": "playfab",
+  "player_count": 2,
+  "max_players": 10,
+  "port": 2456,
+  "join_code": "123456",
+  "public_ip": "203.0.113.7:2456",
+  "game_version": "0.221.12",
+  "lobby_created": "2026-08-10T11:44:03.987654+00:00",
+  "players": []
+}
+```
+
+All the information in `status.json` is fetched from Valheim servers public query port (or the public PlayFab lobby for crossplay servers). You will notice that some of the fields like player name or player score currently contain no information. However for completeness the entire query response is left intact.
 
 Within the container `status.json` is written to `STATUS_HTTP_HTDOCS` which by default is `/opt/valheim/htdocs`. It can either be consumed directly or the user can add their own html/css/js to this directory to read the json data and present it in whichever style they prefer. A file named `index.html` will be shown on `/` if it exists.
 
