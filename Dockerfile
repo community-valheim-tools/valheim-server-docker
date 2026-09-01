@@ -13,14 +13,13 @@ RUN apt-get update \
         python3 \
         python3-pip \
         python3-venv \
-        shellcheck
+        shellcheck \
+        tox
 
 WORKDIR /build/env2cfg
 COPY ./env2cfg/ /build/env2cfg/
 RUN if [ "${TESTS:-true}" = true ]; then \
-    python3 -m venv ../env2cfg.tests.venv \
-    && ../env2cfg.tests.venv/bin/pip3 install tox~=4.28.4 \
-    && ../env2cfg.tests.venv/bin/tox \
+        tox \
     ; \
     fi
 
