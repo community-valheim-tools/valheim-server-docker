@@ -1,5 +1,4 @@
 FROM debian:trixie-slim AS build-env
-ENV DEBIAN_FRONTEND=noninteractive
 ARG TESTS
 ARG SOURCE_COMMIT
 ARG BUSYBOX_VERSION=1.36.1
@@ -7,9 +6,8 @@ ARG SUPERVISOR_VERSION=4.2.5
 ARG GO_VERSION=1.24.1
 ARG PYTHON_A2S_VERSION=1.4.1
 
-RUN apt-get update
-RUN apt-get -y install apt-utils
-RUN apt-get -y install build-essential curl git python3 python3-pip python3-venv shellcheck
+RUN apt-get update \
+    && DEBIAN_FRONTEND="noninteractive" apt-get -y  install build-essential curl git python3 python3-pip python3-venv shellcheck
 
 # Install Go 1.24 manually
 RUN curl -L -o /tmp/go${GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
@@ -91,10 +89,9 @@ RUN echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
 
 FROM --platform=linux/386 debian:buster-slim AS i386-libs
-ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i -E 's/(deb|security).debian.org/archive.debian.org/g' /etc/apt/sources.list \
     && apt-get update \
-    && apt-get -y --no-install-recommends install \
+    && DEBIAN_FRONTEND="noninteractive" apt-get -y --no-install-recommends install \
     libc6-dev \
     libstdc++6 \
     libsdl2-2.0-0 \
@@ -103,7 +100,6 @@ RUN sed -i -E 's/(deb|security).debian.org/archive.debian.org/g' /etc/apt/source
 
 
 FROM debian:trixie-slim
-ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=build-env /usr/local/ /usr/local/
 COPY --from=i386-libs /lib/ld-linux.so.2 /lib/ld-linux.so.2
 COPY --from=i386-libs /lib/i386-linux-gnu /lib/i386-linux-gnu
@@ -113,9 +109,7 @@ COPY fake-supervisord /usr/bin/supervisord
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
     && apt-get update \
-    && apt-get -y --no-install-recommends install apt-utils \
-    && apt-get -y dist-upgrade \
-    && apt-get -y --no-install-recommends install \
+    && DEBIAN_FRONTEND="noninteractive" apt-get -y --no-install-recommends install \
     libc6-dev \
     libsdl2-2.0-0 \
     curl \
