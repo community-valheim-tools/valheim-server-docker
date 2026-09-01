@@ -57,7 +57,7 @@ status_http_server_updater_conf=/usr/local/etc/supervisor/conf.d/status_http_ser
 cmd_valheim_status=/usr/local/bin/valheim-status
 cmd_valheim_is_idle=/usr/local/bin/valheim-is-idle
 cmd_valheim_logfilter=/usr/local/bin/valheim-logfilter
-cmd_supervisorctl=/usr/local/bin/supervisorctl
+cmd_supervisorctl=/usr/bin/supervisorctl
 
 # Syslog supervisor config file
 supervisor_syslog_conf=/usr/local/etc/supervisor/conf.d/syslog.conf

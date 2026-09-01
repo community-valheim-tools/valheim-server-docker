@@ -1,7 +1,6 @@
 FROM debian:trixie-slim AS build-env
 ARG TESTS
 ARG SOURCE_COMMIT
-ARG SUPERVISOR_VERSION=4.2.5
 ARG PYTHON_A2S_VERSION=1.4.1
 
 RUN apt-get update \
@@ -64,14 +63,9 @@ RUN if [ "${TESTS:-true}" = true ]; then \
 WORKDIR /
 RUN rm -rf /usr/local/lib/
 # Debian's pip is modded to install to /usr/local by default.
-# Freezes an old version of Setuptools to prevent a flood of deprecation
-# notices while supervisor still uses it. Setuptools dependency can be removed
-# when supervisor>=4.3.0 is released
 RUN pip3 install --break-system-packages \
-    python-a2s==${PYTHON_A2S_VERSION} \
-    supervisor==${SUPERVISOR_VERSION} \
-    "Setuptools<67.5.0" \
-    /build/env2cfg
+        python-a2s==${PYTHON_A2S_VERSION} \
+        /build/env2cfg
 COPY supervisord.conf /usr/local/etc/supervisord.conf
 RUN mkdir -p /usr/local/etc/supervisor/conf.d/ \
     && chmod 640 /usr/local/etc/supervisord.conf
@@ -121,6 +115,7 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     python3-pkg-resources \
     python3-setuptools \
     rsync \
+    supervisor \
     sysstat \
     tini \
     unzip \

@@ -11,16 +11,16 @@ main() {
         if [ -e /var/run/supervisor.sock ]; then
             echo "Current Service Status"
             echo "======================"
-            /usr/local/bin/supervisorctl status
+            /usr/bin/supervisorctl status
             echo
-            if [ "$(/usr/local/bin/supervisorctl status valheim-server | awk '{print $2}')" != "STOPPED" ]; then
+            if [ "$(/usr/bin/supervisorctl status valheim-server | awk '{print $2}')" != "STOPPED" ]; then
                 echo "Server Log: Last 200 Bytes"
                 echo "=========================="
-                /usr/local/bin/supervisorctl tail -200 valheim-server
+                /usr/bin/supervisorctl tail -200 valheim-server
             else
                 echo "Updater Log: Last 200 Bytes"
                 echo "==========================="
-                /usr/local/bin/supervisorctl tail -200 valheim-updater
+                /usr/bin/supervisorctl tail -200 valheim-updater
             fi
             echo
         fi
@@ -35,10 +35,10 @@ main() {
             echo "Dumping logs and exiting..."
             echo "Updater Log: Last 4096 Bytes"
             echo "============================"
-            /usr/local/bin/supervisorctl tail -4096 valheim-updater
+            /usr/bin/supervisorctl tail -4096 valheim-updater
             echo "Server Log: Last 4096 Bytes"
             echo "==========================="
-            /usr/local/bin/supervisorctl tail -4096 valheim-server
+            /usr/bin/supervisorctl tail -4096 valheim-server
             exit 1
         fi
     done

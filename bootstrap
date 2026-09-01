@@ -13,7 +13,7 @@ main() {
     setup_supervisor_http_server
     setup_status_http_server
     pre_supervisor_hook
-    exec /usr/bin/tini -- /usr/local/bin/supervisord -c /usr/local/etc/supervisord.conf
+    exec /usr/bin/tini -- /usr/bin/supervisord -c /usr/local/etc/supervisord.conf
 }
 
 
