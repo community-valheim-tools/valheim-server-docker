@@ -1,7 +1,6 @@
 FROM debian:trixie-slim AS build-env
 ARG TESTS
 ARG SOURCE_COMMIT
-ARG BUSYBOX_VERSION=1.36.1
 ARG SUPERVISOR_VERSION=4.2.5
 ARG PYTHON_A2S_VERSION=1.4.1
 
@@ -15,13 +14,6 @@ RUN apt-get update \
         python3-pip \
         python3-venv \
         shellcheck
-
-WORKDIR /build/busybox
-COPY ./busybox.config /build/busybox/.config
-RUN curl -L -o /tmp/busybox.tar.bz2 https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2 \
-    && tar xjvf /tmp/busybox.tar.bz2 --strip-components=1 -C /build/busybox \
-    && make \
-    && cp busybox /usr/local/bin/
 
 WORKDIR /build/env2cfg
 COPY ./env2cfg/ /build/env2cfg/
@@ -108,27 +100,32 @@ COPY fake-supervisord /usr/bin/supervisord
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
     && apt-get update \
-    && DEBIAN_FRONTEND="noninteractive" apt-get -y --no-install-recommends install \
-    libc6-dev \
-    libsdl2-2.0-0 \
-    curl \
-    iproute2 \
-    libcurl4 \
+    && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
+    busybox \
     ca-certificates \
-    procps \
-    locales \
-    unzip \
-    zip \
-    rsync \
-    openssh-client \
+    curl \
+    daemontools \
+    iproute2 \
     jq \
-    python3-minimal \
-    python3-pkg-resources \
-    python3-setuptools \
-    libpulse-dev \
     libatomic1 \
     libc6 \
+    libc6-dev \
+    libcurl4 \
+    libpulse-dev \
+    libsdl2-2.0-0 \
+    locales \
+    lsof \
+    openssh-client \
+    procps \
+    python3 \
+    python3-pip \
+    python3-pkg-resources \
+    python3-setuptools \
+    rsync \
+    sysstat \
     tini \
+    unzip \
+    zip \
     && echo 'LANG="en_US.UTF-8"' > /etc/default/locale \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
     && rm -f /bin/sh \
@@ -138,31 +135,28 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && apt-get clean \
     && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd /home/valheim/.config/unity3d/IronGate /config /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bc \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bunzip2 \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bzcat \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/bzip2 \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/crontab \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/httpd \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/iostat \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/killall \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/less \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/lsof \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ping \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ping6 \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/setuidgid \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/ssl_client \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/traceroute \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/traceroute6 \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/unxz \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/vi \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/wget \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/xz \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/xzcat \
-    && ln -s /usr/local/bin/busybox /usr/local/bin/xxd \
-    && ln -s /usr/local/bin/busybox /usr/local/sbin/crond \
-    && ln -s /usr/local/bin/busybox /usr/local/sbin/mkpasswd \
-    && ln -s /usr/local/bin/busybox /usr/local/sbin/syslogd \
+    && ln -s /usr/bin/busybox /usr/local/bin/bc \
+    && ln -s /usr/bin/busybox /usr/local/bin/bunzip2 \
+    && ln -s /usr/bin/busybox /usr/local/bin/bzcat \
+    && ln -s /usr/bin/busybox /usr/local/bin/bzip2 \
+    && ln -s /usr/bin/busybox /usr/local/bin/crontab \
+    && ln -s /usr/bin/busybox /usr/local/bin/httpd \
+    && ln -s /usr/bin/busybox /usr/local/bin/killall \
+    && ln -s /usr/bin/busybox /usr/local/bin/less \
+    && ln -s /usr/bin/busybox /usr/local/bin/ping \
+    && ln -s /usr/bin/busybox /usr/local/bin/ping6 \
+    && ln -s /usr/bin/busybox /usr/local/bin/ssl_client \
+    && ln -s /usr/bin/busybox /usr/local/bin/traceroute \
+    && ln -s /usr/bin/busybox /usr/local/bin/traceroute6 \
+    && ln -s /usr/bin/busybox /usr/local/bin/unxz \
+    && ln -s /usr/bin/busybox /usr/local/bin/vi \
+    && ln -s /usr/bin/busybox /usr/local/bin/wget \
+    && ln -s /usr/bin/busybox /usr/local/bin/xz \
+    && ln -s /usr/bin/busybox /usr/local/bin/xzcat \
+    && ln -s /usr/bin/busybox /usr/local/bin/xxd \
+    && ln -s /usr/bin/busybox /usr/local/sbin/crond \
+    && ln -s /usr/bin/busybox /usr/local/sbin/mkpasswd \
+    && ln -s /usr/bin/busybox /usr/local/sbin/syslogd \
     && curl -L -o /tmp/steamcmd_linux.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
     && tar xzvf /tmp/steamcmd_linux.tar.gz -C /opt/steamcmd/ \
     && chown -R valheim:valheim /var/run/valheim \
