@@ -3,19 +3,18 @@ ARG TESTS
 ARG SOURCE_COMMIT
 ARG BUSYBOX_VERSION=1.36.1
 ARG SUPERVISOR_VERSION=4.2.5
-ARG GO_VERSION=1.24.1
 ARG PYTHON_A2S_VERSION=1.4.1
 
 RUN apt-get update \
-    && DEBIAN_FRONTEND="noninteractive" apt-get -y  install build-essential curl git python3 python3-pip python3-venv shellcheck
-
-# Install Go 1.24 manually
-RUN curl -L -o /tmp/go${GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
-    && tar -C /usr/local -xzf /tmp/go${GO_VERSION}.linux-amd64.tar.gz \
-    && rm /tmp/go${GO_VERSION}.linux-amd64.tar.gz
-ENV PATH=$PATH:/usr/local/go/bin
-ENV GOPATH=/go
-ENV PATH=$PATH:$GOPATH/bin
+    && DEBIAN_FRONTEND="noninteractive" apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        golang \
+        python3 \
+        python3-pip \
+        python3-venv \
+        shellcheck
 
 WORKDIR /build/busybox
 COPY ./busybox.config /build/busybox/.config
@@ -36,7 +35,7 @@ RUN if [ "${TESTS:-true}" = true ]; then \
 WORKDIR /build/valheim-logfilter
 COPY ./valheim-logfilter/ /build/valheim-logfilter/
 RUN if [ "${TESTS:-true}" = true ]; then \
-    go test ./... \
+        go test ./... \
     ; \
     fi
 RUN go build -ldflags="-s -w" \
