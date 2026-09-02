@@ -1,6 +1,6 @@
 ARG PYTHON_A2S_VERSION=1.4.2
 
-FROM debian:trixie-slim AS build-env
+FROM steamcmd/steamcmd:debian-trixie AS build-env
 ARG TESTS
 ARG SOURCE_COMMIT
 ARG PYTHON_A2S_VERSION
@@ -47,12 +47,10 @@ RUN if [ "${TESTS:-true}" = true ]; then \
     fi
 
 
-FROM debian:trixie-slim
+FROM steamcmd/steamcmd:debian-trixie
 ARG PYTHON_A2S_VERSION
-ARG SOURCE_COMMIT
 COPY ./usr/local/ /usr/local/
 COPY --from=build-env /usr/local/bin/valheim-logfilter /usr/local/bin/valheim-logfilter
-
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
     && dpkg --add-architecture i386 \
@@ -95,11 +93,9 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && pip3 install --break-system-packages python-a2s==${PYTHON_A2S_VERSION} \
     && echo 'LANG="en_US.UTF-8"' > /etc/default/locale \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
-    && rm -f /bin/sh \
-    && ln -s /bin/bash /bin/sh \
     && locale-gen \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
-    && mkdir -p /config /home/valheim/.config/unity3d/IronGate /opt/steamcmd /opt/valheim  /usr/local/etc/supervisor/conf.d/ /var/log/supervisor /var/spool/cron/crontabs /var/run/valheim \
+    && mkdir -p /config /home/valheim/.config/unity3d/IronGate /opt/valheim /usr/local/etc/supervisor/conf.d/ /var/log/supervisor /var/spool/cron/crontabs /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
     && ln -s /usr/bin/busybox /usr/local/bin/bc \
     && ln -s /usr/bin/busybox /usr/local/bin/bunzip2 \
@@ -123,17 +119,10 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && ln -s /usr/bin/busybox /usr/local/sbin/crond \
     && ln -s /usr/bin/busybox /usr/local/sbin/mkpasswd \
     && ln -s /usr/bin/busybox /usr/local/sbin/syslogd \
-    && curl -L -o /tmp/steamcmd_linux.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
-    && tar xzvf /tmp/steamcmd_linux.tar.gz -C /opt/steamcmd/ \
     && chown -R valheim:valheim /var/run/valheim \
-    && chown -R root:root /opt/steamcmd \
-    && chmod u=rwx,go=rx /opt/steamcmd/steamcmd.sh \
     && chmod a+s /usr/local/bin/crontab \
-    /opt/steamcmd/linux32/steamcmd \
-    /opt/steamcmd/linux32/steamerrorreporter \
     /usr/bin/supervisord \
-    && cd "/opt/steamcmd" \
-    && su - valheim -c "/opt/steamcmd/steamcmd.sh +login anonymous +quit" \
+    && su - valheim -c "/usr/bin/steamcmd +login anonymous +quit" \
     && date --utc --iso-8601=seconds > /usr/local/etc/build.date \
     && echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
@@ -143,3 +132,4 @@ EXPOSE 9001/tcp
 EXPOSE 80/tcp
 WORKDIR /
 CMD ["/usr/local/sbin/bootstrap"]
+ENTRYPOINT []

@@ -29,7 +29,6 @@ apply_permissions() {
     chown -R valheim:valheim \
         /config \
         /opt/valheim \
-        /opt/steamcmd \
         /home/valheim \
         /var/run/valheim \
         "$SERVER_STATUS_FILE"

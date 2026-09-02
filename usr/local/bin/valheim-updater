@@ -9,7 +9,6 @@
 . /usr/local/etc/valheim/common
 
 debug "Running Valheim Server updater as user $USER uid $UID"
-cd /opt/steamcmd || fatal "Could not cd /opt/steamcmd"
 pidfile=$valheim_updater_pidfile
 next_update=$(date +%s)
 run=true
@@ -132,7 +131,7 @@ download_valheim() {
     sleep 1
     pkill -KILL steamcmd || true
     # shellcheck disable=SC2086
-    /opt/steamcmd/steamcmd.sh +force_install_dir "$valheim_download_path" +login anonymous +app_update 896660 $STEAMCMD_ARGS +quit
+    /usr/bin/steamcmd +force_install_dir "$valheim_download_path" +login anonymous +app_update 896660 $STEAMCMD_ARGS +quit
 }
 
 
