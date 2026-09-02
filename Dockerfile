@@ -4,7 +4,6 @@ FROM debian:trixie-slim AS build-env
 ARG TESTS
 ARG SOURCE_COMMIT
 ARG PYTHON_A2S_VERSION
-
 RUN apt-get update \
     && DEBIAN_FRONTEND="noninteractive" apt-get install -y \
         build-essential \
@@ -48,28 +47,15 @@ RUN if [ "${TESTS:-true}" = true ]; then \
     fi
 
 
-FROM --platform=linux/386 debian:buster-slim AS i386-libs
-RUN sed -i -E 's/(deb|security).debian.org/archive.debian.org/g' /etc/apt/sources.list \
-    && apt-get update \
-    && DEBIAN_FRONTEND="noninteractive" apt-get -y --no-install-recommends install \
-    libc6-dev \
-    libstdc++6 \
-    libsdl2-2.0-0 \
-    libcurl4 \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-
 FROM debian:trixie-slim
 ARG PYTHON_A2S_VERSION
 ARG SOURCE_COMMIT
 COPY ./usr/local/ /usr/local/
 COPY --from=build-env /usr/local/bin/valheim-logfilter /usr/local/bin/valheim-logfilter
-COPY --from=i386-libs /lib/ld-linux.so.2 /lib/ld-linux.so.2
-COPY --from=i386-libs /lib/i386-linux-gnu /lib/i386-linux-gnu
-COPY --from=i386-libs /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
 
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
+    && dpkg --add-architecture i386 \
     && apt-get update \
     && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
     busybox \
@@ -80,10 +66,16 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     jq \
     libatomic1 \
     libc6 \
+    libc6:i386 \
     libc6-dev \
+    libc6-dev:i386 \
     libcurl4 \
+    libcurl4:i386 \
     libpulse-dev \
     libsdl2-2.0-0 \
+    libsdl2-2.0-0:i386 \
+    libstdc++6 \
+    libstdc++6:i386 \
     locales \
     lsof \
     openssh-client \
@@ -144,6 +136,7 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && su - valheim -c "/opt/steamcmd/steamcmd.sh +login anonymous +quit" \
     && date --utc --iso-8601=seconds > /usr/local/etc/build.date \
     && echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
+
 
 EXPOSE 2456-2458/udp
 EXPOSE 9001/tcp
