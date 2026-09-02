@@ -1,17 +1,16 @@
+ARG PYTHON_A2S_VERSION=1.4.2
+
 FROM debian:trixie-slim AS build-env
 ARG TESTS
 ARG SOURCE_COMMIT
-ARG PYTHON_A2S_VERSION=1.4.1
+ARG PYTHON_A2S_VERSION
 
 RUN apt-get update \
     && DEBIAN_FRONTEND="noninteractive" apt-get install -y \
         build-essential \
-        curl \
-        git \
         golang \
         python3 \
         python3-pip \
-        python3-venv \
         shellcheck \
         tox
 
@@ -32,44 +31,21 @@ RUN go build -ldflags="-s -w" \
     && mv valheim-logfilter /usr/local/bin/
 
 WORKDIR /build
-COPY bootstrap /usr/local/sbin/
-COPY valheim-tests /usr/local/bin/
-COPY valheim-status /usr/local/bin/
-COPY valheim-is-idle /usr/local/bin/
-COPY valheim-bootstrap /usr/local/bin/
-COPY valheim-backup /usr/local/bin/
-COPY valheim-updater /usr/local/bin/
-COPY valheim-plus-updater /usr/local/bin/
-COPY bepinex-updater /usr/local/bin/
-COPY valheim-server /usr/local/bin/
-COPY defaults /usr/local/etc/valheim/
-COPY common /usr/local/etc/valheim/
-COPY contrib/* /usr/local/share/valheim/contrib/
-RUN chmod 755 /usr/local/sbin/bootstrap /usr/local/bin/valheim-*
+COPY ./usr/local/ /usr/local/
 RUN if [ "${TESTS:-true}" = true ]; then \
-    shellcheck -a -x -s bash -e SC2034 \
-    /usr/local/sbin/bootstrap \
-    /usr/local/bin/valheim-tests \
-    /usr/local/bin/valheim-backup \
-    /usr/local/bin/valheim-is-idle \
-    /usr/local/bin/valheim-bootstrap \
-    /usr/local/bin/valheim-server \
-    /usr/local/bin/valheim-updater \
-    /usr/local/bin/valheim-plus-updater \
-    /usr/local/bin/bepinex-updater \
-    /usr/local/share/valheim/contrib/*.sh \
-    ; \
+        shellcheck -a -x -s bash -e SC2034 \
+        /usr/local/sbin/bootstrap \
+        /usr/local/bin/valheim-tests \
+        /usr/local/bin/valheim-backup \
+        /usr/local/bin/valheim-is-idle \
+        /usr/local/bin/valheim-bootstrap \
+        /usr/local/bin/valheim-server \
+        /usr/local/bin/valheim-updater \
+        /usr/local/bin/valheim-plus-updater \
+        /usr/local/bin/bepinex-updater \
+        /usr/local/share/valheim/contrib/*.sh \
+        ; \
     fi
-WORKDIR /
-RUN rm -rf /usr/local/lib/
-# Debian's pip is modded to install to /usr/local by default.
-RUN pip3 install --break-system-packages \
-        python-a2s==${PYTHON_A2S_VERSION} \
-        /build/env2cfg
-COPY supervisord.conf /usr/local/etc/supervisord.conf
-RUN mkdir -p /usr/local/etc/supervisor/conf.d/ \
-    && chmod 640 /usr/local/etc/supervisord.conf
-RUN echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
 
 FROM --platform=linux/386 debian:buster-slim AS i386-libs
@@ -84,11 +60,13 @@ RUN sed -i -E 's/(deb|security).debian.org/archive.debian.org/g' /etc/apt/source
 
 
 FROM debian:trixie-slim
-COPY --from=build-env /usr/local/ /usr/local/
+ARG PYTHON_A2S_VERSION
+ARG SOURCE_COMMIT
+COPY ./usr/local/ /usr/local/
+COPY --from=build-env /usr/local/bin/valheim-logfilter /usr/local/bin/valheim-logfilter
 COPY --from=i386-libs /lib/ld-linux.so.2 /lib/ld-linux.so.2
 COPY --from=i386-libs /lib/i386-linux-gnu /lib/i386-linux-gnu
 COPY --from=i386-libs /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
-COPY fake-supervisord /usr/bin/supervisord
 
 RUN groupadd -g "${PGID:-0}" -o valheim \
     && useradd -g "${PGID:-0}" -u "${PUID:-0}" -o --create-home valheim \
@@ -120,14 +98,16 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     tini \
     unzip \
     zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && pip3 install --break-system-packages python-a2s==${PYTHON_A2S_VERSION} \
     && echo 'LANG="en_US.UTF-8"' > /etc/default/locale \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
     && rm -f /bin/sh \
     && ln -s /bin/bash /bin/sh \
     && locale-gen \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
-    && apt-get clean \
-    && mkdir -p /var/spool/cron/crontabs /var/log/supervisor /opt/valheim /opt/steamcmd /home/valheim/.config/unity3d/IronGate /config /var/run/valheim \
+    && mkdir -p /config /home/valheim/.config/unity3d/IronGate /opt/steamcmd /opt/valheim  /usr/local/etc/supervisor/conf.d/ /var/log/supervisor /var/spool/cron/crontabs /var/run/valheim \
     && ln -s /config /home/valheim/.config/unity3d/IronGate/Valheim \
     && ln -s /usr/bin/busybox /usr/local/bin/bc \
     && ln -s /usr/bin/busybox /usr/local/bin/bunzip2 \
@@ -162,8 +142,8 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     /usr/bin/supervisord \
     && cd "/opt/steamcmd" \
     && su - valheim -c "/opt/steamcmd/steamcmd.sh +login anonymous +quit" \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && date --utc --iso-8601=seconds > /usr/local/etc/build.date
+    && date --utc --iso-8601=seconds > /usr/local/etc/build.date \
+    && echo "${SOURCE_COMMIT:-unknown}" > /usr/local/etc/git-commit.HEAD
 
 EXPOSE 2456-2458/udp
 EXPOSE 9001/tcp
