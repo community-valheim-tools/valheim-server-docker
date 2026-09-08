@@ -3,6 +3,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG TESTS
 ARG SOURCE_COMMIT
 ARG BUSYBOX_VERSION=1.36.1
+ARG BUSYBOX_SHA256=b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314
 ARG SUPERVISOR_VERSION=4.2.5
 ARG GO_VERSION=1.24.1
 ARG PYTHON_A2S_VERSION=1.4.1
@@ -21,10 +22,19 @@ ENV PATH=$PATH:$GOPATH/bin
 
 WORKDIR /build/busybox
 COPY ./busybox.config /build/busybox/.config
-RUN curl -L -o /tmp/busybox.tar.bz2 https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2 \
-    && tar xjvf /tmp/busybox.tar.bz2 --strip-components=1 -C /build/busybox \
-    && make \
-    && cp busybox /usr/local/bin/
+RUN set -eu; \
+    for base in \
+        https://sources.buildroot.net/busybox \
+        https://downloads.yoctoproject.org/mirror/sources \
+        https://busybox.net/downloads; do \
+        echo "Fetching busybox-${BUSYBOX_VERSION}.tar.bz2 from ${base}"; \
+        curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 \
+            -o /tmp/busybox.tar.bz2 "${base}/busybox-${BUSYBOX_VERSION}.tar.bz2" && break || true; \
+    done; \
+    echo "${BUSYBOX_SHA256}  /tmp/busybox.tar.bz2" | sha256sum -c -; \
+    tar xjf /tmp/busybox.tar.bz2 --strip-components=1 -C /build/busybox; \
+    make -j"$(nproc)"; \
+    cp busybox /usr/local/bin/
 
 WORKDIR /build/env2cfg
 COPY ./env2cfg/ /build/env2cfg/
