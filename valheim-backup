@@ -12,6 +12,9 @@ pidfile=$valheim_backup_pidfile
 next_backup=$(date +%s)
 run=true
 
+# Flat pre-1.0 world files, backed up individually.
+oldWorldFileExtensions=(db fwl db.old fwl.old)
+
 
 main() {
     local last_activity
@@ -46,6 +49,7 @@ main() {
 
 backup() {
     local backup_file
+    local backup_folder
     local WORLDS_DIR
     if [ -d "$worlds_dir" ]; then
         WORLDS_DIR=$worlds_dir
@@ -59,19 +63,24 @@ backup() {
     mkdir -p "$BACKUPS_DIRECTORY"
     chmod "$BACKUPS_DIRECTORY_PERMISSIONS" "$BACKUPS_DIRECTORY"
 
+    local world_folder
+    world_folder="$WORLDS_DIR/$WORLD_NAME"
+
     if [ "${BACKUPS_ZIP}" = true ]; then
         backup_file="$BACKUPS_DIRECTORY/worlds-$(date +%Y%m%d-%H%M%S).zip"
         pre_backup_hook "$backup_file"
         info "Backing up Valheim server worlds to $backup_file"
-        zip -r "$backup_file" "$WORLDS_DIR/" -x '*_backup_auto-*.*'
+        archive_world_stable "$world_folder" "$backup_file" \
+            zip -r "$backup_file" "$WORLDS_DIR/" -x '*_backup_auto-*.*' '*_backup_auto-*/' '*_backup_auto-*/*'
         chmod "$BACKUPS_FILE_PERMISSIONS" "$backup_file"
         post_backup_hook "$backup_file"
     else
         local world_file
+        local extension
         local backup_suffix
         backup_suffix=$(date +%Y%m%d-%H%M%S)
 
-        for extension in {db,fwl,db.old,fwl.old}; do
+        for extension in "${oldWorldFileExtensions[@]}"; do
             world_file="$WORLDS_DIR/$WORLD_NAME.$extension"
             if [ ! -f "$world_file" ]; then
                 debug "World file $world_file not found - skipping"
@@ -84,7 +93,91 @@ backup() {
             chmod "$BACKUPS_FILE_PERMISSIONS" "$backup_file"
             post_backup_hook "$backup_file"
         done
+
+        if [ -d "$world_folder" ]; then
+            backup_folder="$BACKUPS_DIRECTORY/AUTOBACKUP-${WORLD_NAME}-$backup_suffix"
+            pre_backup_hook "$backup_folder"
+            info "Backing up Valheim server world directory $world_folder to $backup_folder"
+            if archive_world_stable "$world_folder" "$backup_folder" \
+                copy_world_directory "$world_folder" "$backup_folder"; then
+                post_backup_hook "$backup_folder"
+            else
+                # A half-copied directory looks like a whole backup, so drop it.
+                error "Failed to copy world directory $world_folder to $backup_folder"
+                rm -rf -- "$backup_folder"
+            fi
+        fi
     fi
+}
+
+
+# Marker files of every committed save generation. The server writes
+# _main.<n>.ok last and only then deletes generation <n-1> and the chunk
+# versions it superseded, so a marker set unchanged across a read means
+# nothing was reaped underneath it.
+chunked_save_generations() {
+    local world_folder
+    world_folder="$1"
+    find "$world_folder" -maxdepth 1 -type f -name '_main.*.ok' -printf '%f\n' 2>/dev/null | sort | tr '\n' ' '
+}
+
+
+# Copies a world directory into $2 with the configured backup modes. cp -a
+# stamps the destination with the source's mtime, which flush_old prunes
+# by, so restamp it with the backup time.
+copy_world_directory() {
+    local world_folder
+    local backup_folder
+    world_folder="$1"
+    backup_folder="$2"
+
+    mkdir -p "$backup_folder" || return 1
+    cp -a "$world_folder/." "$backup_folder/" || return 1
+    touch "$backup_folder"
+    chmod "$BACKUPS_DIRECTORY_PERMISSIONS" "$backup_folder"
+    find "$backup_folder" -type d -exec chmod "$BACKUPS_DIRECTORY_PERMISSIONS" "{}" +
+    find "$backup_folder" -type f -exec chmod "$BACKUPS_FILE_PERMISSIONS" "{}" +
+}
+
+
+# Runs archive command $3... over world directory $1, producing $2,
+# retrying if a save commits mid-read and leaves the backup with a chunk
+# index pointing at versions the server has since deleted. $2 is cleared
+# between attempts. A non-chunked world has nothing to race, so the
+# command runs once. Returns the command's exit status.
+archive_world_stable() {
+    local world_folder
+    local backup_file
+    local attempt
+    local generations_before
+    local generations_after
+    local rc
+    world_folder="$1"; shift
+    backup_file="$1"; shift
+    [ -n "$backup_file" ] || return 1
+
+    if [ ! -d "$world_folder" ]; then
+        "$@"
+        return
+    fi
+
+    for attempt in 1 2 3; do
+        generations_before=$(chunked_save_generations "$world_folder")
+        rm -rf -- "$backup_file"
+        if "$@"; then
+            rc=0
+        else
+            rc=$?
+        fi
+        generations_after=$(chunked_save_generations "$world_folder")
+        if [ "$generations_before" = "$generations_after" ]; then
+            return "$rc"
+        fi
+        debug "World $WORLD_NAME was saved while being backed up (generations '$generations_before' -> '$generations_after') - retrying (attempt $attempt)"
+    done
+
+    warn "Could not capture $world_folder between server saves after $attempt attempts - keeping $backup_file, but it may be missing chunks"
+    return "$rc"
 }
 
 
@@ -123,9 +216,10 @@ flush_old() {
         if [ "${BACKUPS_ZIP}" = true ]; then
             find "$BACKUPS_DIRECTORY" -type f -name "worlds-*.zip" -printf '%T@ %p\0' | sort -z -n -r | cut -z -s -d " " -f "2-" | tail -z -n +$((BACKUPS_MAX_COUNT+1)) | xargs -0 rm -fv -- 2>/dev/null
         else
-            for extension in {db,fwl,db.old,fwl.old}; do
+            for extension in "${oldWorldFileExtensions[@]}"; do
                 find "$BACKUPS_DIRECTORY" -type f -name "AUTOBACKUP-${WORLD_NAME}-*.${extension}" -printf '%T@ %p\0' | sort -z -n -r | cut -z -s -d " " -f "2-" | tail -z -n +$((BACKUPS_MAX_COUNT+1)) | xargs -0 rm -v -- 2>/dev/null
             done
+            find "$BACKUPS_DIRECTORY" -mindepth 1 -maxdepth 1 -type d -name "AUTOBACKUP-${WORLD_NAME}-*" -printf '%T@ %p\0' | sort -z -n -r | cut -z -s -d " " -f "2-" | tail -z -n +$((BACKUPS_MAX_COUNT+1)) | xargs -0 rm -rfv -- 2>/dev/null
         fi
     fi
 
@@ -133,9 +227,10 @@ flush_old() {
     if [ "${BACKUPS_ZIP}" = true ]; then
         find "$BACKUPS_DIRECTORY" -type f -mmin "+$((BACKUPS_MAX_AGE*60*24))" -name "worlds-*.zip" -print -exec rm -f "{}" \;
     else
-        for extension in {db,fwl,db.old,fwl.old}; do
+        for extension in "${oldWorldFileExtensions[@]}"; do
             find "$BACKUPS_DIRECTORY" -type f -mmin "+$((BACKUPS_MAX_AGE*60*24))" -name "AUTOBACKUP-${WORLD_NAME}-*.${extension}" -print -exec rm -f "{}" \;
         done
+        find "$BACKUPS_DIRECTORY" -mindepth 1 -maxdepth 1 -type d -mmin "+$((BACKUPS_MAX_AGE*60*24))" -name "AUTOBACKUP-${WORLD_NAME}-*" -print -exec rm -rf "{}" +
     fi
 }
 
