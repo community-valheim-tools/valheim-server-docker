@@ -114,6 +114,20 @@ printline() {
 }
 
 
+# Applies the configured directory and file modes to a worlds directory,
+# which since 1.0 may hold a directory per world rather than flat files.
+ensure_worlds_permissions() {
+    local dir
+    dir="$1"
+    if [ ! -d "$dir" ]; then
+        return 0
+    fi
+    chmod "$WORLDS_DIRECTORY_PERMISSIONS" "$dir"
+    find "$dir" -type d -exec chmod "$WORLDS_DIRECTORY_PERMISSIONS" "{}" +
+    find "$dir" -type f -exec chmod "$WORLDS_FILE_PERMISSIONS" "{}" +
+}
+
+
 ensure_permissions() {
     local restore_errexit=false
     if [ -o errexit ]; then
@@ -123,14 +137,8 @@ ensure_permissions() {
     chmod "$CONFIG_DIRECTORY_PERMISSIONS" /config
     chmod -f "$CONFIG_FILE_PERMISSIONS" /config/*.txt
     # Legacy worlds directory
-    if [ -d "$old_worlds_dir" ]; then
-        chmod "$WORLDS_DIRECTORY_PERMISSIONS" "$old_worlds_dir"
-        chmod "$WORLDS_FILE_PERMISSIONS" "${old_worlds_dir}/"*
-    fi
-    if [ -d "$worlds_dir" ]; then
-        chmod "$WORLDS_DIRECTORY_PERMISSIONS" "$worlds_dir"
-        chmod "$WORLDS_FILE_PERMISSIONS" "${worlds_dir}/"*
-    fi
+    ensure_worlds_permissions "$old_worlds_dir"
+    ensure_worlds_permissions "$worlds_dir"
     if [ "$VALHEIM_PLUS" = true ] && [ -d /config/valheimplus ]; then
         find /config/valheimplus -type d -exec chmod "$VALHEIM_PLUS_CONFIG_DIRECTORY_PERMISSIONS" "{}" +
         find /config/valheimplus -type f -exec chmod "$VALHEIM_PLUS_CONFIG_FILE_PERMISSIONS" "{}" +

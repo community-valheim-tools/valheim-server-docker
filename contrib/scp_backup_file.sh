@@ -15,8 +15,9 @@
 # BACKUP_SCP_PORT defaults to 22
 # BACKUP_SCP_KEY path to a private key file
 
-# Full path to the worlds_local backup ZIP we just created
-# e.g. /config/backups/worlds_local-20210303-144536.zip
+# Full path to the backup we just created. Usually a file, e.g.
+# /config/backups/worlds-20210303-144536.zip - but with BACKUPS_ZIP=false
+# a Valheim 1.0 world is backed up as a directory.
 backup_file=$1
 
 : "${BACKUP_SCP_USER:=}" "${BACKUP_SCP_HOST:=}" "${BACKUP_SCP_PATH:=}"
@@ -41,4 +42,4 @@ BACKUP_SCP_PATH=${BACKUP_SCP_PATH%/}
 destination="$BACKUP_SCP_USER@$BACKUP_SCP_HOST:$BACKUP_SCP_PATH/$(basename "$backup_file")"
 
 echo "Using scp to copy $backup_file to $destination"
-timeout 300 scp "${scp_args[@]}" "$backup_file" "$destination"
+timeout 300 scp -r "${scp_args[@]}" "$backup_file" "$destination"

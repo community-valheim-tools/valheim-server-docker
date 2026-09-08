@@ -102,7 +102,7 @@ Warning: `SERVER_PASS` must be at least 5 characters long. Otherwise `valheim_se
 
 A fresh start will take several minutes depending on your Internet connection speed as the container will download the Valheim dedicated server from Steam (~1 GB).
 
-Do not forget to modify `WORLD_NAME` to reflect the name of your world! For existing worlds that is the filename in the `worlds_local/` folder without the `.db/.fwl` extension.
+Do not forget to modify `WORLD_NAME` to reflect the name of your world! For existing worlds that is the name of the world's directory inside the `worlds_local/` folder, or the filename without the `.db/.fwl` extension for a pre-1.0 world.
 
 If you want to play with friends over the Internet and are behind NAT make sure that UDP ports 2456-2457 are forwarded to the container host. (Remark: If you use crossplay, you don't need port forwarding! See official Valheim Dedicated Server Manual.pdf in the data/server folder.)
 Also ensure they are publicly accessible in any firewall.
@@ -130,7 +130,7 @@ Without it you will see a message `Warning: failed to set thread priority` in th
 | --------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SERVER_NAME`               | `My Server`              | Name that will be shown in the server browser                                                                                                                                                                                                                                          |
 | `SERVER_PORT`               | `2456`                   | UDP start port that the server will listen on                                                                                                                                                                                                                                          |
-| `WORLD_NAME`                | `Dedicated`              | Name of the world without `.db/.fwl` file extension                                                                                                                                                                                                                                    |
+| `WORLD_NAME`                | `Dedicated`              | Name of the world: the directory inside `worlds_local/`, or on pre-1.0 saves the filename without the `.db/.fwl` extension                                                                                                                                                             |
 | `SERVER_PASS`               | `secret`                 | Password for logging into the server - min. 5 characters!                                                                                                                                                                                                                              |
 | `SERVER_PASS_FILE`          |                          | Set to a secrets path (ie `/run/secrets/server_pass`) to read the server password from a secret instead of environment variables                                                                                                                                                       |
 | `SERVER_PUBLIC`             | `true`                   | Whether the server should be listed in the server browser (`true`) or not (`false`)                                                                                                                                                                                                    |
@@ -246,8 +246,8 @@ The following environment variables can be populated to run commands whenever sp
 | `PRE_SUPERVISOR_HOOK`        |         | Command to be executed before supervisord is run. Startup is blocked until this command returns.                                                                                                                                                                              |
 | `PRE_BOOTSTRAP_HOOK`         |         | Command to be executed before bootstrapping is done. Startup is blocked until this command returns.                                                                                                                                                                           |
 | `POST_BOOTSTRAP_HOOK`        |         | Command to be executed after bootstrapping is done and before the server or any services are started. Can be used to install additional packages or perform additional system setup. Startup is blocked until this command returns.                                           |
-| `PRE_BACKUP_HOOK`            |         | Command to be executed before a backup is created. The string `@BACKUP_FILE@` will be replaced by the full path of the future backup zip file. Backups are blocked until this command returns.                                                                                |
-| `POST_BACKUP_HOOK`           |         | Command to be executed after a backup is created. The string `@BACKUP_FILE@` will be replaced by the full path of the backup zip file. Backups are blocked until this command returns. See [Copy backups to another location](#copy-backups-to-another-location) for details. |
+| `PRE_BACKUP_HOOK`            |         | Command to be executed before a backup is created. `@BACKUP_FILE@` is replaced by the future backup's full path. Backups are blocked until this command returns.                                                                                                              |
+| `POST_BACKUP_HOOK`           |         | Command to be executed after a backup is created. `@BACKUP_FILE@` is replaced by the backup's full path. Backups are blocked until this command returns. See [Copy backups to another location](#copy-backups-to-another-location) for details.                               |
 | `PRE_UPDATE_CHECK_HOOK`      |         | Command to be executed before an update check is performed. Current update is blocked until this command returns.                                                                                                                                                             |
 | `POST_UPDATE_CHECK_HOOK`     |         | Command to be executed after an update check was performed. Future updates are blocked until this command returns.                                                                                                                                                            |
 | `PRE_START_HOOK`             |         | Command to be executed before the first server start is performed by the valheim-updater. Current start is blocked until this command returns.                                                                                                                                |
@@ -273,13 +273,14 @@ The following environment variables can be populated to run commands whenever sp
 
 #### Copy backups to another location
 
-After a backup ZIP has been created the command specified by `$POST_BACKUP_HOOK` will be executed if set to a non-zero string.
-Within that command the string `@BACKUP_FILE@` will be replaced by the full path to the just created ZIP file.
+After a backup has been created the command specified by `$POST_BACKUP_HOOK` will be executed if set to a non-zero string.
+Within that command the string `@BACKUP_FILE@` will be replaced by the full path to the just created backup. That is a ZIP file by default;
+with `BACKUPS_ZIP=false` a Valheim 1.0 world is backed up as a directory, so use a command that copies recursively.
 
 ```
 -v $HOME/.ssh/id_rsa:/root/.ssh/id_rsa \
 -v $HOME/.ssh/known_hosts:/root/.ssh/known_hosts \
--e POST_BACKUP_HOOK='timeout 300 scp @BACKUP_FILE@ myself@example.com:~/backups/$(basename @BACKUP_FILE@)'
+-e POST_BACKUP_HOOK='timeout 300 scp -r @BACKUP_FILE@ myself@example.com:~/backups/$(basename @BACKUP_FILE@)'
 ```
 
 #### Notify on Discord
@@ -490,7 +491,13 @@ By default 3 days worth of backups will be kept. A different number can be confi
 It is possible to configure a maximum number of to-be-kept backup files with `BACKUPS_MAX_COUNT`. When going over this limit, the oldest file(s) will be deleted. The default is `0` which means no limit. Note that `BACKUPS_MAX_AGE` will always be respected: if backups get too old, they will be deleted even if `BACKUPS_MAX_COUNT` was not yet reached (or is `0`).
 
 Beware that backups are performed while the server is running. As such files might be in an open state when the backup runs.
-However the `worlds_local/` directory also contains a `.db.old` file for each world which should always be closed and in a consistent state.
+On pre-1.0 saves the `worlds_local/` directory also contains a `.db.old` file for each world which should always be closed and in a consistent state.
+
+Valheim 1.0 stores each world as a directory of many files instead of a single `.db`, so a backup taken mid-save could otherwise capture a
+chunk index that refers to chunk files the server had already replaced. The backup job detects this - the server marks each committed save
+with a `_main.<n>.ok` file - and retries the backup up to three times if the world was saved while it was being read. If none of the attempts
+land between saves the backup is still kept, and a warning is logged. Setting `BACKUPS_IF_IDLE=false` makes this far less likely, since
+backups then only run when players are around and world saves are less frequent.
 
 See [Copy backups to another location](#copy-backups-to-another-location) for an example of how to copy backups offsite.
 
@@ -500,6 +507,16 @@ dedicated server only saves the world in 20 minute intervals and on shutdown. So
 the most recent changes we want to wait out one world save. This grace period also needs to be long enough so that our `BACKUPS_CRON` had a chance to run.
 
 `BACKUPS_ZIP=false` can be used to store backups uncompressed in the backup directory. Please note that this will increase the filesize of the backups, due to no compression.
+
+### Upgrading a world to Valheim 1.0
+
+The first time a 1.0 server opens a world saved by an older version it converts it to the new directory format. As with every Valheim world
+version upgrade this is one-way - an older server cannot read the world afterwards - so make sure you are happy with your backups first.
+
+If you run with a non-root `PUID`/`PGID`, make sure you are on an image that contains this change before letting a 1.0 server convert a
+world. Older images apply the *file* permission mode to everything directly inside `worlds_local/`, which strips the execute bit from the new
+per-world directories and leaves the server unable to open its own save - it logs `UnauthorizedAccessException` and then keeps running with no
+world loaded, so the container still looks healthy. At the default `PUID=0` the server runs as root and is unaffected.
 
 ## Manual backup
 
