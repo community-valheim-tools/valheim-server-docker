@@ -41,21 +41,32 @@ main() {
 
 
 update() {
-    local logfile
+    local logfile install_path="$valheim_install_path"
     if ! is_idle; then
         return
     fi
     pre_update_check_hook
-    logfile="$(mktemp)"
     info "Downloading/updating/validating Valheim server from Steam"
     if ! download_valheim; then
-        if [ -f "$valheim_download_path/valheim_server.x86_64" ]; then
-            error "Failed to update Valheim server from Steam - however an existing version was found locally - using it"
+        # Never merge a failed download; only start the selected installed variant.
+        if [ "$VALHEIM_PLUS" = true ]; then
+            install_path=$vp_install_path
+        elif [ "$BEPINEX" = true ]; then
+            install_path=$bepinex_install_path
+        fi
+        if [ -f "$install_path/valheim_server.x86_64" ]; then
+            error "Failed to update Valheim server from Steam - keeping the existing installation"
+            if [ "$just_started" = true ]; then
+                write_restart_file just_started
+                just_started=false
+            fi
         else
             error "Failed to download Valheim server from Steam - retrying later - check your networking and volume access permissions"
-            return
         fi
+        post_update_check_hook
+        return 1
     fi
+    logfile="$(mktemp)"
     rsync -a --itemize-changes --delete --exclude server_exit.drp --exclude steamapps "$valheim_download_path/" "$valheim_install_path" | tee "$logfile"
     if grep '^[*>]' "$logfile" > /dev/null 2>&1; then
         info "Valheim Server was updated - restarting"
@@ -127,12 +138,89 @@ check_mod() {
 
 
 download_valheim() {
+    local manifest="$valheim_download_path/steamapps/appmanifest_896660.acf"
+    local content_log="$HOME/Steam/logs/content_log.txt"
+    local recovery_dir="$valheim_download_path/steamapps/manifest-recovery"
+    local installed_manifests="" log_identity="" log_offset=0 result denied=false id
+    local server_status status_result=0
+
+    # Snapshot before SteamCMD can change metadata or append new errors.
+    if [ -f "$manifest" ]; then
+        installed_manifests=$(awk -F '"' '
+            $2 == "InstalledDepots" { installed = 1; next }
+            installed && /^[[:space:]]*\{/ { depth++; next }
+            installed && /^[[:space:]]*\}/ { if (--depth == 0) installed = 0; next }
+            installed && depth == 2 && $2 == "manifest" && $4 ~ /^[0-9]+$/ { print $4 }
+        ' "$manifest") || return 1
+    fi
+    if [ -f "$content_log" ]; then
+        log_identity=$(stat -c '%d:%i' "$content_log") || return 1
+        log_offset=$(stat -c '%s' "$content_log") || return 1
+    fi
+
+    if run_steamcmd; then
+        return 0
+    else
+        result=$?
+    fi
+
+    # Only recover from a denial of an installed manifest in this attempt's log.
+    # A rotated/truncated log is ambiguous, so leave it for manual investigation.
+    if [ -z "$installed_manifests" ] || [ ! -f "$content_log" ]; then
+        return "$result"
+    fi
+    if [ -n "$log_identity" ] && [ "$log_identity" != "$(stat -c '%d:%i' "$content_log")" ]; then
+        return "$result"
+    fi
+    if [ "$(stat -c '%s' "$content_log")" -lt "$log_offset" ]; then
+        return "$result"
+    fi
+    for id in $installed_manifests; do
+        if tail -c "+$((log_offset + 1))" "$content_log" |
+            grep -E "CDepotDownloadMgr::BYldRequestDepotManifest\(App: 896660, Depot: [0-9]+, Manifest: $id, branch: [^)]*\): Failed to get manifest request code, 'Access Denied'" > /dev/null; then
+            denied=true
+            break
+        fi
+    done
+    if [ "$denied" != true ]; then
+        return "$result"
+    fi
+    # Supervisor returns 3 for a stopped process. Reject transitional/unknown states.
+    server_status=$(supervisorctl status valheim-server) || status_result=$?
+    if [ "$status_result" -ne 3 ] ||
+        [[ ! "$server_status" =~ ^valheim-server[[:space:]]+STOPPED[[:space:]] ]]; then
+        warn "Steam denied an installed manifest - recovery requires the game server to be stopped"
+        return "$result"
+    fi
+
+    # mkdir reserves the recovery attempt atomically. Keep the backup directory
+    # even after success so another metadata reset requires manual intervention.
+    if ! mkdir "$recovery_dir"; then
+        error "Cannot reserve manifest recovery directory $recovery_dir - refusing another metadata reset"
+        return "$result"
+    fi
+    if ! mv "$manifest" "$recovery_dir/appmanifest_896660.acf"; then
+        error "Cannot preserve Steam installation metadata in $recovery_dir"
+        return "$result"
+    fi
+    warn "Steam denied an installed manifest - metadata preserved in $recovery_dir; retrying once with validation"
+    if run_steamcmd validate; then
+        return 0
+    else
+        result=$?
+        error "Steam manifest recovery failed - metadata backup retained in $recovery_dir; manual investigation required"
+        return "$result"
+    fi
+}
+
+
+run_steamcmd() {
     # Kill any hung steamcmd processes
     pkill -TERM steamcmd || true
     sleep 1
     pkill -KILL steamcmd || true
     # shellcheck disable=SC2086
-    /opt/steamcmd/steamcmd.sh +force_install_dir "$valheim_download_path" +login anonymous +app_update 896660 $STEAMCMD_ARGS +quit
+    /opt/steamcmd/steamcmd.sh +force_install_dir "$valheim_download_path" +login anonymous +app_update 896660 $STEAMCMD_ARGS "$@" +quit
 }
 
 
