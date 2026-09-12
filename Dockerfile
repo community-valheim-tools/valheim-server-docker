@@ -185,7 +185,6 @@ RUN groupadd -g "${PGID:-0}" -o valheim \
     && chown -R valheim:valheim /var/run/valheim \
     && chown -R root:root /opt/steamcmd \
     && chmod u=rwx,go=rx /opt/steamcmd/steamcmd.sh \
-    && chmod a+s /usr/local/bin/crontab \
     /opt/steamcmd/linux32/steamcmd \
     /opt/steamcmd/linux32/steamerrorreporter \
     /usr/bin/supervisord \

@@ -84,7 +84,7 @@ def write_status(status: str, status_file: str) -> None:
 
 def get_status(query_host: str, query_port: int) -> Dict:
     status = {
-        "last_status_update": datetime.utcnow().replace(tzinfo=timezone.utc),
+        "last_status_update": datetime.now(timezone.utc),
         "error": None,
     }
     try:

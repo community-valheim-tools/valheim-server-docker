@@ -2,40 +2,77 @@
 . /usr/local/etc/valheim/defaults
 . /usr/local/etc/valheim/common
 
-# Regression test for BepInEx plugin syncing.
+test_server_is_crossplay() {
+    if ! (CROSSPLAY=true; SERVER_ARGS="-saveinterval 1800"; server_is_crossplay); then
+        echo "CROSSPLAY=true should enable crossplay detection"
+        return 1
+    fi
+    if ! (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800 -crossplay"; server_is_crossplay); then
+        echo "SERVER_ARGS=-crossplay should enable crossplay detection"
+        return 1
+    fi
+    if ! (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800 -CROSSPLAY"; server_is_crossplay); then
+        echo "SERVER_ARGS=-CROSSPLAY should enable crossplay detection"
+        return 1
+    fi
+    if (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800"; server_is_crossplay); then
+        echo "Crossplay detection should be disabled without CROSSPLAY=true or -crossplay"
+        return 1
+    fi
+    echo "Crossplay detection tests passed"
+}
+
+# Regression tests for the BepInEx plugin sync, which both the BEPINEX and the
+# VALHEIM_PLUS paths reach through write_bepinex_config().
 #
-# denikson/BepInExPack_Valheim 5.4.2350 stopped shipping an empty BepInEx/plugins
-# directory that earlier archives provided. write_bepinex_config() used to require
-# that destination to already exist, so on a fresh install the sync was silently
-# skipped and BepInEx loaded 0 plugins. This reproduces that precondition (an
-# extracted pack whose BepInEx/ has no plugins/ subdir) and asserts a plugin placed
-# in the config dir is synced into the install dir. It fails against the old code.
+# BepInExPack_Valheim 5.4.2350 stopped shipping the empty BepInEx/plugins
+# directory that earlier archives provided. write_bepinex_config() used to
+# require that destination to already exist, so the sync was silently skipped
+# and BepInEx loaded 0 plugins. ValheimPlus rebased onto the same pack and
+# dropped the directory as well - it only still has one because its own
+# ValheimPlus.dll keeps it populated, which is also why the sync must never
+# remove what the archive put there.
 test_bepinex_plugin_sync() {
-    local tmp config_path install_path plugins_path
-    echo "Testing BepInEx plugin sync..."
+    local tmp config_path plugins_path rc=0
     tmp=$(mktemp -d)
-    config_path="$tmp/config"
-    install_path="$tmp/install"
-    plugins_path="$install_path/BepInEx/plugins"
-    # A plugin waiting in the config dir, as a user would place it.
-    mkdir -p "$config_path/plugins"
+
+    # BepInEx shape: an extracted pack whose BepInEx/ has no plugins/ subdir.
+    config_path="$tmp/bepinex/config"
+    plugins_path="$tmp/bepinex/install/BepInEx/plugins"
+    mkdir -p "$config_path/plugins" "$tmp/bepinex/install/BepInEx"
     touch "$config_path/BepInEx.cfg"
     echo "dummy" > "$config_path/plugins/TestPlugin.dll"
-    # Simulate a freshly extracted 5.4.2350 pack: BepInEx/ exists, but no plugins/.
-    mkdir -p "$install_path/BepInEx"
     write_bepinex_config "$config_path" "$plugins_path"
-    if [ -f "$plugins_path/TestPlugin.dll" ]; then
-        echo "BepInEx plugin sync OK: TestPlugin.dll synced to install dir"
-        rm -rf "$tmp"
-    else
-        echo "BepInEx plugin sync FAILED: TestPlugin.dll was not synced to $plugins_path"
-        rm -rf "$tmp"
-        exit 1
+    if [ ! -f "$plugins_path/TestPlugin.dll" ]; then
+        echo "BepInEx: TestPlugin.dll was not synced to $plugins_path"
+        rc=1
     fi
+
+    # ValheimPlus shape: the archive ships its own plugin into the destination.
+    config_path="$tmp/valheimplus/config"
+    plugins_path="$tmp/valheimplus/install/BepInEx/plugins"
+    mkdir -p "$config_path/plugins" "$plugins_path"
+    touch "$config_path/BepInEx.cfg"
+    echo "dummy" > "$config_path/plugins/TestPlugin.dll"
+    echo "mod" > "$plugins_path/ValheimPlus.dll"
+    write_bepinex_config "$config_path" "$plugins_path"
+    if [ ! -f "$plugins_path/TestPlugin.dll" ]; then
+        echo "ValheimPlus: TestPlugin.dll was not synced to $plugins_path"
+        rc=1
+    fi
+    if [ ! -f "$plugins_path/ValheimPlus.dll" ]; then
+        echo "ValheimPlus: ValheimPlus.dll from the archive was removed from $plugins_path"
+        rc=1
+    fi
+
+    rm -rf "$tmp"
+    if [ "$rc" -eq 0 ]; then
+        echo "BepInEx plugin sync tests passed"
+    fi
+    return $rc
 }
 
 main() {
-    scenario="${1:-default}"
     timeout=900
     echo "Running tests..."
     echo "Waiting up to $timeout seconds for server to start..."
@@ -75,11 +112,10 @@ main() {
             exit 1
         fi
     done
-    if [ "$scenario" = "bepinex" ]; then
-        test_bepinex_plugin_sync
-    fi
     echo "Tests passed!"
     exit 0
 }
 
-main "$@"
+test_server_is_crossplay || exit 1
+test_bepinex_plugin_sync || exit 1
+main
