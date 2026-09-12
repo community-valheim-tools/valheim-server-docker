@@ -290,7 +290,12 @@ write_bepinex_config() {
         if env | grep "^$BEPINEX_CFG_ENV_PREFIX" > /dev/null; then
             /usr/local/bin/env2cfg --verbose --config "$config_path/BepInEx.cfg" --env-prefix "$BEPINEX_CFG_ENV_PREFIX"
         fi
-        if [ -d "$config_path/plugins" ] && [ -d "$plugins_path" ]; then
+        if [ -d "$config_path/plugins" ]; then
+            # denikson/BepInExPack_Valheim 5.4.2350 stopped shipping the empty
+            # BepInEx/plugins directory that earlier archives provided, so the
+            # destination may not exist after a fresh install and the sync would
+            # otherwise be silently skipped.
+            mkdir -p "$plugins_path"
             info "Syncing BepInEx plugins from $config_path/plugins/ -> $plugins_path"
             rsync -a --itemize-changes "$config_path/plugins/" "$plugins_path"
         fi
