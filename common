@@ -161,7 +161,7 @@ _udp_datagram_count() {
 
 
 server_is_crossplay() {
-    [[ "${SERVER_ARGS,,}" =~ "-crossplay" ]];
+    [[ "$CROSSPLAY" = true || "${SERVER_ARGS,,}" =~ "-crossplay" ]]
 }
 
 
