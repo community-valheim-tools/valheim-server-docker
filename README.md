@@ -4,8 +4,6 @@
 
 Valheim Server in a Docker Container (with [BepInEx](#bepinexpack-valheim) and [ValheimPlus](#valheimplus) support)  
 This project is hosted at [https://github.com/community-valheim-tools/valheim-server-docker](https://github.com/community-valheim-tools/valheim-server-docker)
-It was originally forked from [lloesche/valheim-server-docker](https://github.com/lloesche/valheim-server-docker) and
-for the moment is able to act as a drop-in replacement.
 
 # Table of contents
 
