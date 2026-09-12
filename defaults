@@ -41,6 +41,18 @@ fi
 
 # Crossplay
 CROSSPLAY=${CROSSPLAY:-false}
+# Capture the PlayFab join code from the server log so valheim-status
+# can identify this server's PlayFab lobby without any configuration.
+# Users can override the filter by defining their own with the same name.
+if [ "$CROSSPLAY" = true ] && [ -z "${VALHEIM_LOG_FILTER_CONTAINS_PlayFabJoinCode:-}" ]; then
+    VALHEIM_LOG_FILTER_CONTAINS_PlayFabJoinCode=" registered with join code "
+    # The hook is intentionally a string of shell code - it is eval'd
+    # per matching log line by valheim-logfilter, not by this shell.
+    # shellcheck disable=SC2016,SC2089
+    ON_VALHEIM_LOG_FILTER_CONTAINS_PlayFabJoinCode='{ read l; echo "${l##*join code }" > /var/run/valheim/valheim-joincode.txt; }'
+    # shellcheck disable=SC2090
+    export VALHEIM_LOG_FILTER_CONTAINS_PlayFabJoinCode ON_VALHEIM_LOG_FILTER_CONTAINS_PlayFabJoinCode
+fi
 
 # Debug Flags
 # Flag to wipe all downloaded server data on startup (config is untouched)
