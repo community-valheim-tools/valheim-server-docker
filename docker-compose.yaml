@@ -1,8 +1,15 @@
 services:
   valheim:
     image: ghcr.io/community-valheim-tools/valheim-server
+    cap_drop:
+      - ALL
+      - SYS_MODULE
     cap_add:
       - sys_nice
+      - CHOWN
+      - SETUID
+      - SETGID
+      - KILL
     volumes:
       - $HOME/valheim-server/config:/config
       - $HOME/valheim-server/data:/opt/valheim
