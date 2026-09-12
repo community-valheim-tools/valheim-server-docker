@@ -15,7 +15,11 @@ main() {
     local download_url
     local remote_updated_at
 
-    if ! api_response=$(curl -sfSL -H "accept: application/json" "https://thunderstore.io/api/experimental/package/denikson/BepInExPack_Valheim/"); then
+    if ! api_response=$(curl -sfSL \
+            --retry 5 --retry-delay 5 --retry-all-errors --retry-max-time 90 \
+            -A "valheim-server-docker" \
+            -H "accept: application/json" \
+            "https://thunderstore.io/api/experimental/package/denikson/BepInExPack_Valheim/"); then
         fatal "Error: could not retrieve BepInEx release info from Thunderstore.io API"
     fi
     download_url=$(jq -r  ".latest.download_url" <<< "$api_response" )

@@ -15,7 +15,10 @@ main() {
     local download_url
     local remote_updated_at
 
-    if ! api_response=$(curl -sfSL "https://api.github.com/repos/$VALHEIM_PLUS_REPO/releases/$VALHEIM_PLUS_RELEASE"); then
+    if ! api_response=$(curl -sfSL \
+            --retry 5 --retry-delay 5 --retry-all-errors --retry-max-time 90 \
+            -A "valheim-server-docker" \
+            "https://api.github.com/repos/$VALHEIM_PLUS_REPO/releases/$VALHEIM_PLUS_RELEASE"); then
         fatal "Error: could not retrieve ValheimPlus release info from Github API"
     fi
     api_response=$(jq -r ".assets[] | select(.name == \"$vp_zipfile\")" <<< "$api_response" )

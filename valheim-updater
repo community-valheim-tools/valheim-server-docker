@@ -108,6 +108,10 @@ check_mod() {
             touch "$mod_mergefile"
         fi
         if ! just_started=$just_started "$mod_updater"; then
+            if [ -f "$mod_install_path/valheim_server.x86_64" ]; then
+                warn "Failed to run $mod_name updater - however an existing installation was found at $mod_install_path - using it"
+                return 0
+            fi
             error "Failed to run $mod_name updater - retrying later - check your networking and volume access permissions"
             return 1
         fi
