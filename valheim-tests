@@ -2,7 +2,40 @@
 . /usr/local/etc/valheim/defaults
 . /usr/local/etc/valheim/common
 
+# Regression test for BepInEx plugin syncing.
+#
+# denikson/BepInExPack_Valheim 5.4.2350 stopped shipping an empty BepInEx/plugins
+# directory that earlier archives provided. write_bepinex_config() used to require
+# that destination to already exist, so on a fresh install the sync was silently
+# skipped and BepInEx loaded 0 plugins. This reproduces that precondition (an
+# extracted pack whose BepInEx/ has no plugins/ subdir) and asserts a plugin placed
+# in the config dir is synced into the install dir. It fails against the old code.
+test_bepinex_plugin_sync() {
+    local tmp config_path install_path plugins_path
+    echo "Testing BepInEx plugin sync..."
+    tmp=$(mktemp -d)
+    config_path="$tmp/config"
+    install_path="$tmp/install"
+    plugins_path="$install_path/BepInEx/plugins"
+    # A plugin waiting in the config dir, as a user would place it.
+    mkdir -p "$config_path/plugins"
+    touch "$config_path/BepInEx.cfg"
+    echo "dummy" > "$config_path/plugins/TestPlugin.dll"
+    # Simulate a freshly extracted 5.4.2350 pack: BepInEx/ exists, but no plugins/.
+    mkdir -p "$install_path/BepInEx"
+    write_bepinex_config "$config_path" "$plugins_path"
+    if [ -f "$plugins_path/TestPlugin.dll" ]; then
+        echo "BepInEx plugin sync OK: TestPlugin.dll synced to install dir"
+        rm -rf "$tmp"
+    else
+        echo "BepInEx plugin sync FAILED: TestPlugin.dll was not synced to $plugins_path"
+        rm -rf "$tmp"
+        exit 1
+    fi
+}
+
 main() {
+    scenario="${1:-default}"
     timeout=900
     echo "Running tests..."
     echo "Waiting up to $timeout seconds for server to start..."
@@ -42,8 +75,11 @@ main() {
             exit 1
         fi
     done
+    if [ "$scenario" = "bepinex" ]; then
+        test_bepinex_plugin_sync
+    fi
     echo "Tests passed!"
     exit 0
 }
 
-main
+main "$@"
