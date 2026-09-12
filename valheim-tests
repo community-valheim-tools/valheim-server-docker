@@ -22,52 +22,58 @@ test_server_is_crossplay() {
     echo "Crossplay detection tests passed"
 }
 
-# Regression tests for the BepInEx plugin sync, which both the BEPINEX and the
-# VALHEIM_PLUS paths reach through write_bepinex_config().
-#
-# BepInExPack_Valheim 5.4.2350 stopped shipping the empty BepInEx/plugins
-# directory that earlier archives provided. write_bepinex_config() used to
-# require that destination to already exist, so the sync was silently skipped
-# and BepInEx loaded 0 plugins. ValheimPlus rebased onto the same pack and
-# dropped the directory as well - it only still has one because its own
-# ValheimPlus.dll keeps it populated, which is also why the sync must never
-# remove what the archive put there.
-test_bepinex_plugin_sync() {
-    local tmp config_path plugins_path rc=0
+# Checks the /config -> install sync that both BEPINEX and VALHEIM_PLUS reach
+# through write_bepinex_config(). The packs stopped shipping plugins/ or
+# patchers/, so the destinations must be created and pruning must
+# remove only what prior syncs installed, leaving archive-provided plugins
+# (ValheimPlus.dll - see #657) and patcher-generated MMHOOK files alone.
+test_bepinex_loadable_sync() {
+    local tmp config_path bepinex_path rc=0
     tmp=$(mktemp -d)
+    config_path="$tmp/config"
+    bepinex_path="$tmp/install/BepInEx"
 
-    # BepInEx shape: an extracted pack whose BepInEx/ has no plugins/ subdir.
-    config_path="$tmp/bepinex/config"
-    plugins_path="$tmp/bepinex/install/BepInEx/plugins"
-    mkdir -p "$config_path/plugins" "$tmp/bepinex/install/BepInEx"
+    # Stand-ins for the two things pruning must never touch.
+    mkdir -p "$bepinex_path/plugins/MMHOOK"
+    echo "mod" > "$bepinex_path/plugins/ValheimPlus.dll"
+    echo "generated" > "$bepinex_path/plugins/MMHOOK/MMHOOK_assembly_valheim.dll"
+
+    mkdir -p "$config_path/plugins" "$config_path/patchers"
     touch "$config_path/BepInEx.cfg"
     echo "dummy" > "$config_path/plugins/TestPlugin.dll"
-    write_bepinex_config "$config_path" "$plugins_path"
-    if [ ! -f "$plugins_path/TestPlugin.dll" ]; then
-        echo "BepInEx: TestPlugin.dll was not synced to $plugins_path"
+    echo "dummy" > "$config_path/plugins/StalePlugin.dll"
+    echo "dummy" > "$config_path/patchers/TestPatcher.dll"
+
+    write_bepinex_config "$config_path" "$bepinex_path"
+    if [ ! -f "$bepinex_path/plugins/TestPlugin.dll" ]; then
+        echo "TestPlugin.dll was not synced to $bepinex_path/plugins"
+        rc=1
+    fi
+    # patchers/ is absent from the archive, so the sync has to create it.
+    if [ ! -f "$bepinex_path/patchers/TestPatcher.dll" ]; then
+        echo "TestPatcher.dll was not synced to $bepinex_path/patchers"
         rc=1
     fi
 
-    # ValheimPlus shape: the archive ships its own plugin into the destination.
-    config_path="$tmp/valheimplus/config"
-    plugins_path="$tmp/valheimplus/install/BepInEx/plugins"
-    mkdir -p "$config_path/plugins" "$plugins_path"
-    touch "$config_path/BepInEx.cfg"
-    echo "dummy" > "$config_path/plugins/TestPlugin.dll"
-    echo "mod" > "$plugins_path/ValheimPlus.dll"
-    write_bepinex_config "$config_path" "$plugins_path"
-    if [ ! -f "$plugins_path/TestPlugin.dll" ]; then
-        echo "ValheimPlus: TestPlugin.dll was not synced to $plugins_path"
+    # A plugin dropped from /config is pruned; the other two must remain.
+    rm -f "$config_path/plugins/StalePlugin.dll"
+    write_bepinex_config "$config_path" "$bepinex_path"
+    if [ -f "$bepinex_path/plugins/StalePlugin.dll" ]; then
+        echo "StalePlugin.dll was not pruned from $bepinex_path/plugins"
         rc=1
     fi
-    if [ ! -f "$plugins_path/ValheimPlus.dll" ]; then
-        echo "ValheimPlus: ValheimPlus.dll from the archive was removed from $plugins_path"
+    if [ ! -f "$bepinex_path/plugins/ValheimPlus.dll" ]; then
+        echo "ValheimPlus.dll from the archive was pruned from $bepinex_path/plugins"
+        rc=1
+    fi
+    if [ ! -f "$bepinex_path/plugins/MMHOOK/MMHOOK_assembly_valheim.dll" ]; then
+        echo "generated MMHOOK assembly was pruned from $bepinex_path/plugins"
         rc=1
     fi
 
     rm -rf "$tmp"
     if [ "$rc" -eq 0 ]; then
-        echo "BepInEx plugin sync tests passed"
+        echo "BepInEx loadable sync tests passed"
     fi
     return $rc
 }
@@ -117,5 +123,5 @@ main() {
 }
 
 test_server_is_crossplay || exit 1
-test_bepinex_plugin_sync || exit 1
+test_bepinex_loadable_sync || exit 1
 main

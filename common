@@ -40,6 +40,8 @@ bepinex_mergefile="$bepinex_download_path/merge" # Signaling file created by val
                                                  # server was updated and needs to be merged
                                                  # with BepInEx
 bepinex_zipfile=BepInEx.zip                      # Name of the BepInEx archive
+bepinex_sync_manifest=.synced_from_config        # Record of what the last /config sync
+                                                 # installed, so it can be pruned later
 
 # Collection of PID files
 valheim_server_pidfile=/var/run/valheim/valheim-server.pid
@@ -278,9 +280,40 @@ write_valheim_plus_config() {
 }
 
 
+sync_bepinex_loadables() {
+    local config_path=${1%/}
+    local bepinex_path=${2%/}
+    local manifest="$bepinex_path/$bepinex_sync_manifest"
+    local dir
+    local stale
+    mkdir -p "$bepinex_path"
+    # Remove only what a previous sync installed. Archive-provided plugins
+    # (ValheimPlus.dll - see #657) and files patchers generate into plugins/
+    # at runtime are absent from the manifest, so they survive.
+    if [ -f "$manifest" ]; then
+        while IFS= read -r stale; do
+            if [ -n "$stale" ] && [ ! -e "$config_path/$stale" ]; then
+                debug "Removing $bepinex_path/$stale - no longer present in $config_path"
+                rm -f "$bepinex_path/$stale"
+            fi
+        done < "$manifest"
+    fi
+    : > "$manifest"
+    for dir in plugins patchers; do
+        # Neither side is guaranteed to exist: the archives stopped shipping these
+        # directories, and an install predating patchers support has no config one.
+        mkdir -p "$config_path/$dir" "$bepinex_path/$dir"
+        info "Syncing BepInEx $dir from $config_path/$dir/ -> $bepinex_path/$dir"
+        rsync -a --itemize-changes "$config_path/$dir/" "$bepinex_path/$dir"
+        # ! -type d not -type f: rsync -a installs symlinks, so record them too
+        (cd "$config_path" && find "$dir" ! -type d -printf '%p\n') >> "$manifest"
+    done
+}
+
+
 write_bepinex_config() {
     local config_path=$1
-    local plugins_path=$2
+    local bepinex_path=$2
     if [ -n "$PRE_BEPINEX_CONFIG_HOOK" ]; then
         info "Running pre BepInEx config hook: $PRE_BEPINEX_CONFIG_HOOK"
         eval "$PRE_BEPINEX_CONFIG_HOOK"
@@ -290,15 +323,7 @@ write_bepinex_config() {
         if env | grep "^$BEPINEX_CFG_ENV_PREFIX" > /dev/null; then
             /usr/local/bin/env2cfg --verbose --config "$config_path/BepInEx.cfg" --env-prefix "$BEPINEX_CFG_ENV_PREFIX"
         fi
-        if [ -d "$config_path/plugins" ]; then
-            # denikson/BepInExPack_Valheim 5.4.2350 stopped shipping the empty
-            # BepInEx/plugins directory that earlier archives provided, so the
-            # destination may not exist after a fresh install and the sync would
-            # otherwise be silently skipped.
-            mkdir -p "$plugins_path"
-            info "Syncing BepInEx plugins from $config_path/plugins/ -> $plugins_path"
-            rsync -a --itemize-changes "$config_path/plugins/" "$plugins_path"
-        fi
+        sync_bepinex_loadables "$config_path" "$bepinex_path"
     fi
     if [ -n "$POST_BEPINEX_CONFIG_HOOK" ]; then
         info "Running post BepInEx config hook: $POST_BEPINEX_CONFIG_HOOK"
@@ -442,8 +467,8 @@ merge_mod() {
     # rsync all mod files on top of the dedicated server files
     rsync -a --itemize-changes "$mod_download_path/" "$mod_install_path.tmp"
     # if /config/<modname>/ does not exist copy the default config from the ZIP archive
-    debug "Ensuring $mod_config_path/plugins exists"
-    mkdir -p "$mod_config_path/plugins"
+    debug "Ensuring $mod_config_path/plugins and $mod_config_path/patchers exist"
+    mkdir -p "$mod_config_path/plugins" "$mod_config_path/patchers"
     pkg_config_dir="$mod_install_path.tmp/BepInEx/config"
     if [ -d "$pkg_config_dir" ]; then
         cd "$pkg_config_dir" || fatal "Could not cd $pkg_config_dir"
@@ -459,7 +484,7 @@ merge_mod() {
             if [ "$config_file" = "valheim_plus.cfg" ]; then
                 write_valheim_plus_config
             elif [ "$config_file" = "BepInEx.cfg" ]; then
-                write_bepinex_config "$mod_config_path" "$mod_install_path.tmp/BepInEx/plugins"
+                write_bepinex_config "$mod_config_path" "$mod_install_path.tmp/BepInEx"
             fi
         done
         cd - || fatal "Could not cd -"
