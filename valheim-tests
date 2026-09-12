@@ -2,6 +2,26 @@
 . /usr/local/etc/valheim/defaults
 . /usr/local/etc/valheim/common
 
+test_server_is_crossplay() {
+    if ! (CROSSPLAY=true; SERVER_ARGS="-saveinterval 1800"; server_is_crossplay); then
+        echo "CROSSPLAY=true should enable crossplay detection"
+        return 1
+    fi
+    if ! (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800 -crossplay"; server_is_crossplay); then
+        echo "SERVER_ARGS=-crossplay should enable crossplay detection"
+        return 1
+    fi
+    if ! (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800 -CROSSPLAY"; server_is_crossplay); then
+        echo "SERVER_ARGS=-CROSSPLAY should enable crossplay detection"
+        return 1
+    fi
+    if (CROSSPLAY=false; SERVER_ARGS="-saveinterval 1800"; server_is_crossplay); then
+        echo "Crossplay detection should be disabled without CROSSPLAY=true or -crossplay"
+        return 1
+    fi
+    echo "Crossplay detection tests passed"
+}
+
 main() {
     timeout=900
     echo "Running tests..."
@@ -46,4 +66,5 @@ main() {
     exit 0
 }
 
+test_server_is_crossplay || exit 1
 main
