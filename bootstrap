@@ -13,6 +13,7 @@ main() {
     setup_supervisor_http_server
     setup_status_http_server
     pre_supervisor_hook
+    setup_crontab
     exec /usr/bin/tini -- /usr/local/bin/supervisord -c /usr/local/etc/supervisord.conf
 }
 
@@ -156,6 +157,44 @@ pre_supervisor_hook() {
         info "Running pre supervisor hook: $PRE_SUPERVISOR_HOOK"
         eval "$PRE_SUPERVISOR_HOOK"
     fi
+}
+
+
+# Install valheim's crontab as root, so busybox crontab needn't be suid
+setup_crontab() {
+    local crontab
+    crontab=$(mktemp)
+
+    { echo "SERVER_PUBLIC=$SERVER_PUBLIC"; \
+        echo "SERVER_PORT=$SERVER_PORT"; \
+        echo "STATUS_HTTP_HTDOCS=$STATUS_HTTP_HTDOCS"; } >> "$crontab"
+
+    if [ "$BACKUPS" = true ] && [ -n "$BACKUPS_CRON" ] && [ "$BACKUPS_INTERVAL" = "315360000" ]; then
+        debug "Creating cron to do world backups using schedule $BACKUPS_CRON"
+        echo "$BACKUPS_CRON [ -f \"$valheim_backup_pidfile\" ] && kill -HUP \$(cat $valheim_backup_pidfile)" >> "$crontab"
+    fi
+
+    if [ -n "$UPDATE_CRON" ] && [ "$UPDATE_INTERVAL" = "315360000" ]; then
+        debug "Creating cron to check for updates using schedule $UPDATE_CRON"
+        echo "$UPDATE_CRON [ -f \"$valheim_updater_pidfile\" ] && kill -HUP \$(cat $valheim_updater_pidfile)" >> "$crontab"
+    fi
+
+    if [ -n "$RESTART_CRON" ]; then
+        debug "Creating cron to restart valheim-server using schedule $RESTART_CRON"
+        if [ "$RESTART_IF_IDLE" = true ]; then
+            echo "$RESTART_CRON $cmd_valheim_is_idle && $cmd_supervisorctl restart valheim-server" >> "$crontab"
+        else
+            echo "$RESTART_CRON $cmd_supervisorctl restart valheim-server" >> "$crontab"
+        fi
+    else
+        debug "Environment variable RESTART_CRON is empty - no automatic valheim-server restart scheduled"
+    fi
+
+    # Via stdin: busybox would open a file argument as valheim, who can't read it
+    if ! crontab -u valheim - < "$crontab"; then
+        error "Failed to install crontab - scheduled backups, updates and restarts won't run"
+    fi
+    rm -f "$crontab"
 }
 
 
