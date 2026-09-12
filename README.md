@@ -461,6 +461,12 @@ By default the container will check for Valheim server updates every 15 minutes 
 If an update is found it is downloaded and the server restarted.
 This update schedule can be changed using the `UPDATE_CRON` environment variable.
 
+If Steam denies access to an installed depot manifest, the updater can retry once
+with validation while the server is stopped. The old app manifest is backed up
+under `/opt/valheim/dl/server/steamapps/manifest-recovery/`; this directory prevents
+further automatic resets until manually moved aside after investigation.
+Failed downloads leave the separate installed game unchanged.
+
 # Crossplay
 
 By default the container only allow Steam clients. If you enable the `CROSSPLAY=true` option the server will switch from Steam matchmaking to PlayFab, allowing Xbox and Microsoft Store clients to connect. When enabling crossplay, a third port is opened (2458 UDP) used for the crossplay backend communication.
