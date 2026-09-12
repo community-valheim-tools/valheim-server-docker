@@ -67,6 +67,4 @@ main() {
 }
 
 test_server_is_crossplay || exit 1
-if [ "${1:-}" != "--crossplay-only" ]; then
-    main
-fi
+main
