@@ -127,12 +127,58 @@ check_mod() {
 
 
 download_valheim() {
+    local steamcmd_log
+    local ret
     # Kill any hung steamcmd processes
     pkill -TERM steamcmd || true
     sleep 1
     pkill -KILL steamcmd || true
+    steamcmd_log="$(mktemp)"
+    run_steamcmd_app_update "$steamcmd_log"
+    ret=$?
+    if [ $ret -ne 0 ] && steamcmd_stale_manifest "$steamcmd_log"; then
+        warn "SteamCMD could not update the existing installation because Steam no longer hands out the manifest of the installed build to anonymous logins"
+        warn "Removing $valheim_appmanifest so SteamCMD verifies the existing files against the current build and downloads only what changed"
+        rm -f "$valheim_appmanifest"
+        run_steamcmd_app_update "$steamcmd_log"
+        ret=$?
+    fi
+    rm -f "$steamcmd_log"
+    return $ret
+}
+
+
+run_steamcmd_app_update() {
+    local steamcmd_log=$1
     # shellcheck disable=SC2086
-    /opt/steamcmd/steamcmd.sh +force_install_dir "$valheim_download_path" +login anonymous +app_update 896660 $STEAMCMD_ARGS +quit
+    /opt/steamcmd/steamcmd.sh +force_install_dir "$valheim_download_path" +login anonymous +app_update "$valheim_appid" $STEAMCMD_ARGS +quit 2>&1 | tee "$steamcmd_log"
+    return "${PIPESTATUS[0]}"
+}
+
+
+# SteamCMD needs the manifest of the installed build to compute an update. It
+# caches manifests in $steamcmd_home/depotcache (persisted by valheim-bootstrap),
+# but if the cache is missing it has to request the old manifest from Steam,
+# which is denied for anonymous logins once the manifest is no longer the
+# branch's current one. The update job then ends in state 0x6 and
+# $steamcmd_home/logs/content_log.txt reads
+#   CDepotDownloadMgr::BYldRequestDepotManifest(...): Failed to get manifest request code, 'Access Denied'
+# Removing the appmanifest makes SteamCMD treat the directory as a fresh
+# install: existing files are verified against the current manifest and only
+# changed chunks are downloaded.
+steamcmd_stale_manifest() {
+    local steamcmd_log=$1
+    if [ ! -f "$valheim_appmanifest" ]; then
+        return 1
+    fi
+    if grep -q "state is 0x6 after update job" "$steamcmd_log"; then
+        return 0
+    fi
+    if [ -f "$steamcmd_home/logs/content_log.txt" ] \
+        && tail -n 200 "$steamcmd_home/logs/content_log.txt" | grep -q "Failed to get manifest request code"; then
+        return 0
+    fi
+    return 1
 }
 
 

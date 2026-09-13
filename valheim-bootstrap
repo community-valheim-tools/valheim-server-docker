@@ -49,6 +49,18 @@ fi
 mkdir -p "$valheim_download_path"
 mkdir -p "$valheim_install_path"
 
+# Keep SteamCMD's depot manifest cache on the /opt/valheim volume. SteamCMD
+# needs the installed build's manifest to update, and anonymous logins cannot
+# re-download a manifest once it is no longer the branch's current one, so
+# losing $HOME/Steam/depotcache on container re-creation breaks updates.
+mkdir -p "$steamcmd_depotcache_path" "$steamcmd_home"
+if [ -d "$steamcmd_home/depotcache" ] && [ ! -L "$steamcmd_home/depotcache" ]; then
+    cp -an "$steamcmd_home/depotcache/." "$steamcmd_depotcache_path/" 2> /dev/null || true
+    rm -rf "$steamcmd_home/depotcache"
+fi
+ln -sfn "$steamcmd_depotcache_path" "$steamcmd_home/depotcache"
+debug "SteamCMD depot manifest cache persisted at $steamcmd_depotcache_path"
+
 # Mod support
 if [ "$VALHEIM_PLUS" = true ] && [ "$BEPINEX" = true ]; then
     error "Configuration error: enable ValheimPlus or BepInEx mod support but not both - aborting startup"

@@ -10,11 +10,17 @@ just_started=${just_started:-true}
 #         |___/dl/            <= downloads happen in here
 #         |     |___/server/  <= vanilla server download
 #         |     |___/plus/    <= ValheimPlus mod download
+#         |     |___/depotcache/ <= persisted SteamCMD depot manifest cache
 #         |___/server/        <= vanilla server installation
 #         |___/plus/          <= merge of vanilla server and ValheimPlus mod
 #
 valheim_download_path=/opt/valheim/dl/server    # Valheim server download directory
 valheim_install_path=/opt/valheim/server        # Valheim server installation directory
+valheim_appid=896660                            # Steam app id of the Valheim dedicated server
+valheim_appmanifest="$valheim_download_path/steamapps/appmanifest_$valheim_appid.acf"
+steamcmd_home=/home/valheim/Steam               # SteamCMD client state (lives in the container, not on a volume)
+steamcmd_depotcache_path=/opt/valheim/dl/depotcache # Where we keep SteamCMD's depot manifest cache so
+                                                #  it survives container re-creation (see valheim-bootstrap)
 valheim_restartfile="/tmp/valheim.restart"      # Signaling file created by valheim-updater
                                                 # or valheim-plus-updater that describes
                                                 # if and how to restart the server

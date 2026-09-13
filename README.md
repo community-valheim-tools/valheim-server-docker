@@ -79,6 +79,7 @@ to e.g.
  `$HOME/valheim-server/config/worlds_local`
 and run the image with `$HOME/valheim-server/config` volume mounted to `/config` inside the container.
 The container directory `/opt/valheim` contains the downloaded server. It can optionally be volume mounted to avoid having to download the server on each fresh start.
+It also holds SteamCMD's depot manifest cache (`/opt/valheim/dl/depotcache`), which SteamCMD needs to update an existing installation after Valheim was updated on Steam, so the cache stays in sync with the installation it belongs to.
 
 ```
 $ mkdir -p $HOME/valheim-server/config/worlds_local $HOME/valheim-server/data
