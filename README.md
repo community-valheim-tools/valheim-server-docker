@@ -353,7 +353,6 @@ Example:
 -e VALHEIM_PLUS=true \
 -e VPCFG_Server_enabled=true \
 -e VPCFG_Server_enforceMod=false \
--e VPCFG_Server_dataRate=500 \
 -e BEPINEXCFG_Logging_DOT_Console_Enabled=true
 ```
 
@@ -363,7 +362,6 @@ turns into `/config/valheimplus/valheim_plus.cfg`
 [Server]
 enabled=true
 enforceMod=false
-dataRate=500
 ```
 
 and `/config/valheimplus/BepInEx.cfg`
@@ -764,7 +762,7 @@ It has been incorporated into this container. To enable V+ provide the env varia
 Upon first start V+ will create a new directory `/config/valheimplus` where its config files are located.
 As a user you are mainly concerned with the values in `/config/valheimplus/valheim_plus.cfg`.
 For most modifications the mod has to be installed both, on the server as well as all the clients that connect to the server.
-A few modifications, like for example changing the `dataRate` can be done server only.
+A few modifications can be done server only.
 
 ### Updates
 
