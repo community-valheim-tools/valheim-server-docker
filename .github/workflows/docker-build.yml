@@ -143,12 +143,8 @@ jobs:
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          gh release create "${{ github.ref_name }}" --generate-notes --notes-start-tag "$(cat <<'EOF'
-          ## Container Image
-          ```
-          docker pull ghcr.io/community-valheim-tools/valheim-server:${{ steps.meta.outputs.version }}
-          ```
-          EOF
-          )"
+          GENERATED_NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="${{ github.ref_name }}" -q .body)
+          printf '## Container Image\n```\ndocker pull ghcr.io/community-valheim-tools/valheim-server:%s\n```\n\n%s\n' "${{ steps.meta.outputs.version }}" "$GENERATED_NOTES" > release-notes.md
+          gh release create "${{ github.ref_name }}" --notes-file release-notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
