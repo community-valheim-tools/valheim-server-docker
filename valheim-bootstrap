@@ -61,7 +61,7 @@ if [ "$VALHEIM_PLUS" = true ]; then
     mkdir -p "$vp_install_path"
     if [ -d "$vp_config_path" ]; then
         write_valheim_plus_config
-        write_bepinex_config "$vp_config_path" "$vp_install_path/BepInEx/plugins"
+        write_bepinex_config "$vp_config_path" "$vp_install_path/BepInEx"
     fi
 fi
 
@@ -69,7 +69,7 @@ if [ "$BEPINEX" = true ]; then
     mkdir -p "$bepinex_download_path"
     mkdir -p "$bepinex_install_path"
     if [ -d "$bepinex_config_path" ]; then
-        write_bepinex_config "$bepinex_config_path" "$bepinex_install_path/BepInEx/plugins"
+        write_bepinex_config "$bepinex_config_path" "$bepinex_install_path/BepInEx"
     fi
 fi
 

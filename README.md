@@ -155,10 +155,10 @@ Without it you will see a message `Warning: failed to set thread priority` in th
 | `PERMISSIONS_UMASK`         | `022`                    | [Umask](https://en.wikipedia.org/wiki/Umask) to use for backups, config files and directories                                                                                                                                                                                          |
 | `STEAMCMD_ARGS`             | `validate`               | Additional steamcmd CLI arguments                                                                                                                                                                                                                                                      |
 | `PUBLIC_TEST`               | `false`                  | Run the Public Test Beta version of Valheim server. Note that this simply extends existing `STEAMCMD_ARGS` by adding the appropriate beta flags to it.                                                                                                                                 |
-| `VALHEIM_PLUS`              | `false`                  | Whether [ValheimPlus](https://github.com/valheimPlus/ValheimPlus) mod should be loaded (config in `/config/valheimplus`, additional plugins in `/config/valheimplus/plugins`). Can not be used together with `BEPINEX`.                                                                |
+| `VALHEIM_PLUS`              | `false`                  | Whether [ValheimPlus](https://github.com/valheimPlus/ValheimPlus) mod should be loaded (config in `/config/valheimplus`, additional plugins in `/config/valheimplus/plugins`, patchers in `/config/valheimplus/patchers`). Can not be used together with `BEPINEX`.                    |
 | `VALHEIM_PLUS_REPO`         | `Grantapher/ValheimPlus` | Which ValheimPlus Github repo to use. Useful for switching to forks.                                                                                                                                                                                                                   |
 | `VALHEIM_PLUS_RELEASE`      | `latest`                 | Which version of [ValheimPlus](https://github.com/valheimPlus/ValheimPlus) to download. Will default to latest available. To specify a specific tag set to `tags/0.9.9.8`                                                                                                              |
-| `BEPINEX`                   | `false`                  | Whether [BepInExPack Valheim](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/) mod should be loaded (config in `/config/bepinex`, plugins in `/config/bepinex/plugins`). Can not be used together with `VALHEIM_PLUS`.                                           |
+| `BEPINEX`                   | `false`                  | Whether [BepInExPack Valheim](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/) mod should be loaded (config in `/config/bepinex`, plugins in `/config/bepinex/plugins`, patchers in `/config/bepinex/patchers`). Can not be used together with `VALHEIM_PLUS`.   |
 | `SUPERVISOR_HTTP`           | `false`                  | Turn on supervisor's http server                                                                                                                                                                                                                                                       |
 | `SUPERVISOR_HTTP_PORT`      | `9001`                   | Set supervisor's http server port                                                                                                                                                                                                                                                      |
 | `SUPERVISOR_HTTP_USER`      | `admin`                  | Supervisor http server username                                                                                                                                                                                                                                                        |
@@ -743,8 +743,11 @@ Remark: Some Mods are using RPC commands, which needs gameport+2 for communicati
 To enable BepInExPack provide the env variable `BEPINEX=true`. This can not be specified together with `VALHEIM_PLUS=true`.
 Just like Valheim Server this mod is automatically updated using the `UPDATE_CRON` schedule.
 
-Upon first start BepInExPack will create a new directory `/config/bepinex` where its config files are located.
-BepInEx plugins must be copied into the `/config/bepinex/plugins/` directory. From there they will be automatically copied into `/opt/valheim/bepinex/BepInEx/plugins/` on install/update.
+Upon first start, BepInExPack creates a new directory `/config/bepinex` where its config files are located.
+BepInEx plugins must be copied into the `/config/bepinex/plugins/` directory and BepInEx patchers into `/config/bepinex/patchers/`.
+From there they're synced into `/opt/valheim/bepinex/BepInEx/plugins/` and `/opt/valheim/bepinex/BepInEx/patchers/` on container start and on install/update.
+The sync is one-way: a plugin or patcher removed from `/config` is also removed from the server directory on the next sync.
+Only files a previous sync installed are removed, so plugins that came with the mod archive itself and files a patcher generates at runtime (such as HookGenPatcher's `MMHOOK` assemblies) are left alone.
 
 ### Configuration
 
@@ -761,6 +764,7 @@ See [Mod config from Environment Variables](#mod-config-from-environment-variabl
 It has been incorporated into this container. To enable V+ provide the env variable `VALHEIM_PLUS=true`. This can not be specified together with `BEPINEX=true`.
 Upon first start V+ will create a new directory `/config/valheimplus` where its config files are located.
 As a user you are mainly concerned with the values in `/config/valheimplus/valheim_plus.cfg`.
+Additional BepInEx plugins go into `/config/valheimplus/plugins/` and patchers into `/config/valheimplus/patchers/`, synced into the server directory exactly as described under [BepInExPack Valheim](#bepinexpack-valheim).
 For most modifications the mod has to be installed both, on the server as well as all the clients that connect to the server.
 A few modifications can be done server only.
 
