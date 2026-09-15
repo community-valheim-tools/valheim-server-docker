@@ -54,12 +54,22 @@ mkdir -p "$valheim_install_path"
 # re-download a manifest once it is no longer the branch's current one, so
 # losing $HOME/Steam/depotcache on container re-creation breaks updates.
 mkdir -p "$steamcmd_depotcache_path" "$steamcmd_home"
+link_depotcache=true
 if [ -d "$steamcmd_home/depotcache" ] && [ ! -L "$steamcmd_home/depotcache" ]; then
-    cp -an "$steamcmd_home/depotcache/." "$steamcmd_depotcache_path/" 2> /dev/null || true
-    rm -rf "$steamcmd_home/depotcache"
+    # Entries already on the volume belong to the installation there, so they win.
+    if cp -rn "$steamcmd_home/depotcache/." "$steamcmd_depotcache_path/"; then
+        rm -rf "$steamcmd_home/depotcache"
+    else
+        # Linking now would put the symlink inside the directory we failed to
+        # empty, so keep using it in place rather than lose the manifests.
+        link_depotcache=false
+        warn "Could not copy the existing depot manifest cache to $steamcmd_depotcache_path - keeping it at $steamcmd_home/depotcache, where it will not survive container re-creation"
+    fi
 fi
-ln -sfn "$steamcmd_depotcache_path" "$steamcmd_home/depotcache"
-debug "SteamCMD depot manifest cache persisted at $steamcmd_depotcache_path"
+if [ "$link_depotcache" = true ]; then
+    ln -sfn "$steamcmd_depotcache_path" "$steamcmd_home/depotcache"
+    debug "SteamCMD depot manifest cache persisted at $steamcmd_depotcache_path"
+fi
 
 # Mod support
 if [ "$VALHEIM_PLUS" = true ] && [ "$BEPINEX" = true ]; then
