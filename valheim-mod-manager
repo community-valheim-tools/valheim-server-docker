@@ -1,0 +1,165 @@
+#!/bin/bash
+# valheim-mod-manager is called by valheim-updater when MOD_MANAGER=true.
+# It runs vmm to download and install Thunderstore plugins into BepInEx.
+
+. /usr/local/etc/valheim/defaults
+. /usr/local/etc/valheim/common
+
+
+remove_stale_mods() {
+    local plugins_dir="$1"
+    local patchers_dir="$2"
+    local cache_dir="$3"
+    local cache_downloads="$cache_dir/downloads"
+    local removed=false
+    local name version mod_dir
+
+    # Build expected set from vmm's fully-resolved mod list (explicit + transitive deps)
+    declare -A expected_mods
+    while read -r name version; do
+        [[ -n "$name" ]] || continue
+        expected_mods["$name"]="$version"
+    done < <(vmm list 2>/dev/null)
+
+    if [[ ${#expected_mods[@]} -eq 0 ]]; then
+        debug "vmm list returned no mods - skipping stale mod cleanup"
+        return 0
+    fi
+
+    # Remove stale plugin dirs - only touch vmm-managed ones (those present in downloads/)
+    for mod_dir in "$plugins_dir"/*/; do
+        [ -d "$mod_dir" ] || continue
+        name=$(basename "$mod_dir")
+        [ -d "$cache_downloads/$name" ] || continue  # not vmm-managed, leave it alone
+
+        if [[ ! "${expected_mods[$name]+_}" ]]; then
+            info "Removing stale mod: $name"
+            rm -rf "$mod_dir"
+            rm -rf "${cache_downloads:?}/$name"
+            rm -f "$cache_downloads/$name"-*.zip
+            removed=true
+
+            if [ -d "$patchers_dir/$name" ]; then
+                info "Removing stale patcher: $name"
+                rm -rf "${patchers_dir:?}/$name"
+            fi
+        fi
+    done
+
+    # Remove old version zips for mods still installed (left over after an update)
+    for name in "${!expected_mods[@]}"; do
+        version="${expected_mods[$name]}"
+        find "$cache_downloads" -maxdepth 1 -name "${name}-*.zip" \
+            ! -name "${name}-${version}.zip" -exec rm -f {} +
+    done
+
+    [ "$removed" = true ]
+}
+
+
+# install_patchers copies BepInEx/patchers/ content out of any mod directory
+# that packages a patcher (e.g. HookGenPatcher) into the actual patchers
+# directory where BepInEx will find and run it.
+install_patchers() {
+    local plugins_dir="$1"
+    local patchers_dir="$2"
+    local mod_dir
+    local mod_name
+    local found=false
+
+    for mod_dir in "$plugins_dir"/*/; do
+        [ -d "$mod_dir/BepInEx/patchers" ] || continue
+        found=true
+        mod_name=$(basename "$mod_dir")
+        info "Installing patcher files for $mod_name -> $patchers_dir/$mod_name/"
+        mkdir -p "$patchers_dir/$mod_name"
+        rsync -a --itemize-changes "$mod_dir/BepInEx/patchers/" "$patchers_dir/$mod_name/"
+    done
+
+    if [ "$found" = false ]; then
+        debug "No patcher mods found"
+    fi
+}
+
+
+main() {
+    local bepinex_root
+    local plugins_dir
+    local patchers_dir
+    local marker
+    local config_source
+
+    if [ "$MOD_MANAGER" != true ]; then
+        debug "Mod manager is disabled - skipping"
+        return 0
+    fi
+
+    if [ -z "$MOD_MANAGER_MODS" ] && [ ! -f "$mod_manager_config" ]; then
+        debug "MOD_MANAGER_MODS is not set and no config file found at $mod_manager_config - skipping vmm run"
+        return 0
+    fi
+
+    if [ -n "$MOD_MANAGER_MODS" ]; then
+        config_source="environment variable MOD_MANAGER_MODS"
+        info "Using mod list from $config_source: $MOD_MANAGER_MODS"
+    else
+        config_source="$mod_manager_config"
+        info "Using mod list from $config_source"
+        while IFS= read -r mod; do
+            info "  - $mod"
+        done < <(grep -v '^\s*#' "$mod_manager_config" | grep -v '^\s*$')
+    fi
+
+    bepinex_root="$bepinex_install_path/BepInEx"
+    plugins_dir="$bepinex_root/plugins"
+    patchers_dir="$bepinex_root/patchers"
+    marker=$(mktemp)
+
+    info "Updating Thunderstore manifest"
+    cd /config || fatal "Could not cd /config"
+
+    if ! vmm update manifest; then
+        error "vmm failed to update manifest - retrying later"
+        rm -f "$marker"
+        return 1
+    fi
+    info "Manifest update complete"
+
+    info "Downloading and installing Thunderstore mods"
+    if ! vmm update mods; then
+        error "vmm failed to update mods - retrying later"
+        rm -f "$marker"
+        return 1
+    fi
+    info "Mod downloads complete"
+
+    # Remove mods no longer in the config (and their cache/patcher entries).
+    info "Checking for stale mods"
+    local stale_removed=false
+    if ! remove_stale_mods "$plugins_dir" "$patchers_dir" "$MOD_MANAGER_CACHE_DIR"; then
+        stale_removed=true
+    fi
+
+    # Copy patcher assemblies to BepInEx/patchers/ so BepInEx discovers them.
+    # Regular plugins are already under BepInEx/plugins/Owner-ModName/ and
+    # BepInEx traverses subdirectories when loading plugins.
+    info "Checking for patcher mods"
+    install_patchers "$plugins_dir" "$patchers_dir"
+
+    # Detect changes in both plugins and patchers so server restarts whenever
+    # any mod type is installed, updated, or removed.
+    info "Checking for mod changes"
+    if [ "$stale_removed" = true ] || \
+       find "$plugins_dir" "$patchers_dir" -newer "$marker" -type f 2>/dev/null | grep -q .; then
+        info "Thunderstore mods were updated - signaling server restart"
+        write_restart_file updated
+    else
+        info "Thunderstore mods are up to date"
+    fi
+    rm -f "$marker"
+
+    return 0
+}
+
+
+main

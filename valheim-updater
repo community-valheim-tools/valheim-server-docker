@@ -85,8 +85,10 @@ check_mods() {
     local mod_vp_status=$?
     check_mod "$valheim_server_update_status" "BepInEx" "$BEPINEX" "$bepinex_mergefile" "$bepinex_install_path" "$bepinex_updater"
     local mod_bepinex_status=$?
+    run_mod_manager
+    local mod_manager_status=$?
 
-    if [ $mod_vp_status -ne 0 ] || [ $mod_bepinex_status -ne 0 ]; then
+    if [ $mod_vp_status -ne 0 ] || [ $mod_bepinex_status -ne 0 ] || [ $mod_manager_status -ne 0 ]; then
         ret=1
     fi
     return $ret
@@ -121,6 +123,19 @@ check_mod() {
                 return 1
             fi
         fi
+    fi
+    return 0
+}
+
+
+run_mod_manager() {
+    if [ "$MOD_MANAGER" != true ] || [ "$BEPINEX" != true ]; then
+        return 0
+    fi
+    debug "Running valheim-mod-manager"
+    if ! just_started=$just_started "$mod_manager_wrapper"; then
+        error "Failed to run valheim-mod-manager - retrying later"
+        return 1
     fi
     return 0
 }
