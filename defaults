@@ -110,6 +110,15 @@ VALHEIM_PLUS_CFG_ENV_PREFIX=${VALHEIM_PLUS_CFG_ENV_PREFIX:-VPCFG_}
 BEPINEX=${BEPINEX:-false}
 BEPINEX_CFG_ENV_PREFIX=${BEPINEX_CFG_ENV_PREFIX:-BEPINEXCFG_}
 
+# Mod Manager (vmm) - Thunderstore plugin installer, requires BEPINEX=true
+MOD_MANAGER=${MOD_MANAGER:-false}
+# Space- or comma-separated list of mods in Author-ModName or Author-ModName-1.2.3 format
+MOD_MANAGER_MODS=${MOD_MANAGER_MODS:-}
+# Plain-text file listing mods one per line; # comments and blank lines are ignored
+MOD_MANAGER_MODS_FILE=${MOD_MANAGER_MODS_FILE:-/config/thunderstore_mods.txt}
+MOD_MANAGER_DATA_DIR=${MOD_MANAGER_DATA_DIR:-/config/vmm_data}
+MOD_MANAGER_LOG_LEVEL=${MOD_MANAGER_LOG_LEVEL:-error}
+
 # Permissions
 PERMISSIONS_UMASK=${PERMISSIONS_UMASK:-022}
 DEFAULT_DIRECTORY_PERMISSIONS=${DEFAULT_DIRECTORY_PERMISSIONS:-$(printf "%#o" $(( 0777 & ~8#$PERMISSIONS_UMASK )))}

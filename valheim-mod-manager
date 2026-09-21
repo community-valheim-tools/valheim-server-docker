@@ -1,0 +1,132 @@
+#!/bin/bash
+# valheim-mod-manager is called by valheim-updater when MOD_MANAGER=true.
+# It delegates to vmm (valheim-mod-manager CLI) to install and update
+# Thunderstore plugins into BepInEx.
+
+# shellcheck source=defaults
+. /usr/local/etc/valheim/defaults
+# shellcheck source=common
+. /usr/local/etc/valheim/common
+
+
+# Emit one mod entry per line, merging MOD_MANAGER_MODS env var and
+# MOD_MANAGER_MODS_FILE.  Blank lines and # comments are stripped.
+parse_mod_list() {
+    local entry line mods_arr
+
+    if [ -n "$MOD_MANAGER_MODS" ]; then
+        # Normalise commas to spaces then split into array safely
+        local mods_str="${MOD_MANAGER_MODS//,/ }"
+        read -r -a mods_arr <<< "$mods_str"
+        for entry in "${mods_arr[@]}"; do
+            [ -n "$entry" ] && echo "$entry"
+        done
+    fi
+
+    if [ -f "$MOD_MANAGER_MODS_FILE" ]; then
+        while IFS= read -r line; do
+            entry="${line%%#*}"             # strip inline comments
+            entry="${entry//[[:space:]]/}"  # strip whitespace
+            [ -n "$entry" ] && echo "$entry"
+        done < "$MOD_MANAGER_MODS_FILE"
+    fi
+}
+
+
+# Strip a trailing semver component (-Major.Minor.Patch) to get the bare
+# Author-ModName identifier that vmm uses for uninstall.
+mod_base_name() {
+    echo "$1" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+$//'
+}
+
+
+# Uninstall mods that were in the previous desired list but are no longer.
+remove_stale_mods() {
+    local desired_file="$1"
+    local prev_file="$MOD_MANAGER_DATA_DIR/previous_mods.txt"
+    local old_mod old_base removed=false
+
+    [ -f "$prev_file" ] || return 1
+
+    while IFS= read -r old_mod; do
+        [ -n "$old_mod" ] || continue
+        old_base=$(mod_base_name "$old_mod")
+        if ! grep -qF "$old_base" "$desired_file" 2>/dev/null; then
+            info "Uninstalling removed mod: $old_base"
+            if vmm uninstall "$old_base"; then
+                removed=true
+            else
+                warn "vmm uninstall $old_base failed - it may already be absent"
+            fi
+        fi
+    done < "$prev_file"
+
+    [ "$removed" = true ]
+}
+
+
+main() {
+    if [ "$MOD_MANAGER" != true ]; then
+        debug "Mod manager is disabled - skipping"
+        return 0
+    fi
+
+    local desired_mods_file marker mod
+    local -a install_args
+    desired_mods_file=$(mktemp)
+    parse_mod_list | sort -u > "$desired_mods_file"
+
+    if [ ! -s "$desired_mods_file" ]; then
+        debug "Mod list is empty - skipping vmm"
+        rm -f "$desired_mods_file"
+        return 0
+    fi
+
+    marker=$(mktemp)
+
+    # vmm reads vmm_config.toml from the working directory
+    cd /config || fatal "Could not cd /config"
+
+    info "Updating Thunderstore package manifest"
+    if ! vmm update manifest; then
+        error "vmm failed to update Thunderstore manifest - retrying later"
+        rm -f "$desired_mods_file" "$marker"
+        return 1
+    fi
+
+    # Uninstall any mods dropped since the last run before installing the new set
+    if remove_stale_mods "$desired_mods_file"; then
+        info "Stale mods removed"
+    fi
+
+    # Build install arguments from desired list
+    install_args=()
+    while IFS= read -r mod; do
+        install_args+=("$mod")
+    done < "$desired_mods_file"
+
+    info "Installing/updating Thunderstore mods: ${install_args[*]}"
+    if ! vmm install "${install_args[@]}"; then
+        error "vmm failed to install mods - retrying later"
+        rm -f "$desired_mods_file" "$marker"
+        return 1
+    fi
+
+    # Persist desired list so the next run can detect removals
+    cp "$desired_mods_file" "$MOD_MANAGER_DATA_DIR/previous_mods.txt"
+    rm -f "$desired_mods_file"
+
+    # Restart the server if any plugin or patcher file was added, updated, or removed
+    local bepinex_root="$bepinex_install_path/BepInEx"
+    if find "$bepinex_root/plugins" "$bepinex_root/patchers" \
+            -newer "$marker" -type f 2>/dev/null | grep -q .; then
+        info "Thunderstore mods changed - signaling server restart"
+        write_restart_file updated
+    else
+        info "Thunderstore mods are up to date"
+    fi
+    rm -f "$marker"
+}
+
+
+main
