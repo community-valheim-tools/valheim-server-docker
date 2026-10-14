@@ -135,6 +135,12 @@ export VALHEIM_LOG_FILTER_UTF8=${VALHEIM_LOG_FILTER_UTF8:-true}
 export VALHEIM_LOG_FILTER_MATCH=${VALHEIM_LOG_FILTER_MATCH- }
 export VALHEIM_LOG_FILTER_STARTSWITH=${VALHEIM_LOG_FILTER_STARTSWITH-(Filename:}
 export VALHEIM_LOG_FILTER_STARTSWITH_AssertionFailed=${VALHEIM_LOG_FILTER_STARTSWITH_AssertionFailed-src/steamnetworkingsockets/clientlib/steamnetworkingsockets_lowlevel.cpp}
+# Valheim's ZNet.GetPublicIP can wedge in an unthrottled exception loop (five lines per iteration, see #806).
+export VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPException=${VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPException-This instance has already started one or more requests. Properties can only be modified before sending the first request.}
+export VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPCheckStarted=${VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPCheckStarted-at System.Net.Http.HttpClient.CheckDisposedOrStarted}
+export VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPSetTimeout=${VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPSetTimeout-at System.Net.Http.HttpClient.set_Timeout}
+export VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPDownload=${VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPDownload-g__DownloadStringAsync}
+export VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPExtract=${VALHEIM_LOG_FILTER_CONTAINS_GetPublicIPExtract-Could not extract valid IP address from externalIP download string.}
 if [ "$VALHEIM_PLUS" = true ] || [ "$BEPINEX" = true ]; then
     export VALHEIM_LOG_FILTER_STARTSWITH_BepInEx=${VALHEIM_LOG_FILTER_STARTSWITH_BepInEx-Fallback handler could not load library}
 fi
