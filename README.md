@@ -197,6 +197,7 @@ The default filter removes:
 - Log lines consisting of a single space (wtf?)
 - A repeating line saying `(Filename: ./Runtime/Export/Debug/Debug.bindings.h Line: 35)`
 - Lines flooding the log with `Assertion Failed` warnings on packet processing timeouts (See [#104](https://github.com/lloesche/valheim-server-docker/discussions/104))
+- Lines flooding the log from Valheim's `ZNet.GetPublicIP` exception loop on crossplay servers (See [#806](https://github.com/community-valheim-tools/valheim-server-docker/issues/806))
 - If ValheimPlus is turned on lines starting with `Fallback handler could not load library`
 
 ### Log filter event hooks
