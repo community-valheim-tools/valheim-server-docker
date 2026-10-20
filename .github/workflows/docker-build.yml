@@ -61,6 +61,8 @@ jobs:
         config:
           - name: default
             env: ""
+          - name: vanilla_passwordless
+            env: "-e SERVER_PASS= -e SERVER_PUBLIC=false"
           - name: valheim_plus
             env: "-e VALHEIM_PLUS=true"
           - name: bepinex

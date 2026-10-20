@@ -46,7 +46,10 @@ else
     export LD_LIBRARY_PATH="$valheim_install_path/linux64/"
     SERVER_LD_PRELOAD=""
     valheim_server="$valheim_install_path/valheim_server.x86_64"
-    valheim_server_args+=(-password "$SERVER_PASS")
+    # Vanilla servers allow passwordless connections when not publicly listed.
+    if [ -n "$SERVER_PASS" ] || [ "$SERVER_PUBLIC" != 0 ]; then
+        valheim_server_args+=(-password "$SERVER_PASS")
+    fi
 fi
 
 if [ "$CROSSPLAY" = true ]; then

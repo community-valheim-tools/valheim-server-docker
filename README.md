@@ -130,9 +130,9 @@ Without it you will see a message `Warning: failed to set thread priority` in th
 | `SERVER_NAME`               | `My Server`              | Name that will be shown in the server browser                                                                                                                                                                                                                                          |
 | `SERVER_PORT`               | `2456`                   | UDP start port that the server will listen on                                                                                                                                                                                                                                          |
 | `WORLD_NAME`                | `Dedicated`              | Name of the world: the directory inside `worlds_local/`, or on pre-1.0 saves the filename without the `.db/.fwl` extension                                                                                                                                                             |
-| `SERVER_PASS`               | `secret`                 | Password for logging into the server - min. 5 characters!                                                                                                                                                                                                                              |
+| `SERVER_PASS`               | `secret`                 | Password for logging into the server - min. 5 characters when set. Set explicitly to an empty value with `SERVER_PUBLIC=false` to [disable the password](#disable-server-password) without mods. |
 | `SERVER_PASS_FILE`          |                          | Set to a secrets path (ie `/run/secrets/server_pass`) to read the server password from a secret instead of environment variables                                                                                                                                                       |
-| `SERVER_PUBLIC`             | `true`                   | Whether the server should be listed in the server browser (`true`) or not (`false`)                                                                                                                                                                                                    |
+| `SERVER_PUBLIC`             | `true`                   | Whether the server should be listed in the server browser (`true`/`1`) or hidden (`false`/`0`). Hidden servers remain joinable by join code with crossplay enabled, or by IP without crossplay. |
 | `SERVER_ARGS`               |                          | Additional Valheim server CLI arguments                                                                                                                                                                                                                                                |
 | `ADMINLIST_IDS`             |                          | Space separated list of admin SteamIDs in SteamID64 format. Overrides any existing adminlist.txt entries!                                                                                                                                                                              |
 | `BANNEDLIST_IDS`            |                          | Space separated list of banned SteamIDs in SteamID64 format. Overrides any existing bannedlist.txt entries!                                                                                                                                                                            |
@@ -786,7 +786,20 @@ See [Mod config from Environment Variables](#mod-config-from-environment-variabl
 
 #### Disable server password
 
-Another popular mod for LAN play that does not require the clients to run ValheimPlus is to turn off password authentication.
+Vanilla Valheim supports passwordless servers when they are not publicly listed. No mods are required. Set these environment variables:
+
+```ini
+SERVER_PASS=""
+SERVER_PUBLIC=false
+```
+
+`SERVER_PUBLIC=0` also works. The container omits `-password` and passes `-public 0` for this configuration. You must explicitly set an empty password; leaving `SERVER_PASS` unset uses the default password `secret`. If you use `SERVER_PASS_FILE`, its contents override `SERVER_PASS`, so the file must also be empty.
+
+`-public 0` only removes the server from the server browser; it does not prevent players from connecting. With `CROSSPLAY=true` (`-crossplay`), players can still join using the server's join code. Without crossplay, players can join directly by IP address.
+
+For Docker Compose, use `SERVER_PASS: ""` and `SERVER_PUBLIC: "false"` under `environment`. For `docker run`, use `-e SERVER_PASS= -e SERVER_PUBLIC=false`.
+
+If you already use ValheimPlus, you can also disable password authentication through its configuration.
 
 To do so enable ValheimPlus (`VALHEIM_PLUS=true`), set an empty password (`SERVER_PASS=""`), make the server non-public (`SERVER_PUBLIC=false`) and configure the following section in `/config/valheimplus/valheim_plus.cfg`
 
