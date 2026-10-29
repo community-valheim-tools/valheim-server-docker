@@ -21,7 +21,7 @@ fi
 # check if we are supposed to wipe our data directories
 if [ "$DEBUG_START_FRESH" = true ]; then
     warn "Wiping all data directories (DEBUG_START_FRESH: $DEBUG_START_FRESH)"
-    rm -rf "/opt/valheim/*"
+    rm -rf /opt/valheim/*
 fi
 
 # check if we are supposed to reinstall ValheimPlus
